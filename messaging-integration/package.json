@@ -1,0 +1,21 @@
+{
+  "name": "ambassador",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node --env-file=.env src/main.mjs",
+    "chat": "node --env-file=.env src/main.mjs --terminal",
+    "doctor": "node --env-file=.env src/main.mjs --doctor",
+    "test": "node --test --test-isolation=none test/*.test.mjs"
+  },
+  "dependencies": {
+    "google-auth-library": "^10.0.0",
+    "nodemailer": "10.0.14",
+    "spectrum-ts": "12.10.1"
+  },
+  "overrides": {
+    "@opentelemetry/core@<2.8.0": "2.8.0"
+  }
+}
