@@ -2,7 +2,6 @@
 
 Ambassador helps hackathon organizers manage sponsor leads, outreach, and contract status. Organizers interact with the agent through iMessage using Photon Spectrum.
 
-## HI MALHAR
 
 ## Demo flow
 1. The organizer texts: "Check our sponsorship leads and prepare the next outreach."
