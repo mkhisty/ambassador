@@ -21,8 +21,9 @@ The website handles campaign overview, contact management, bulk imports, relatio
 ## Stack and files
 
 - Next.js 16 App Router, React 19, JavaScript modules; Node.js 24+.
-- `app/workspace.js`: client interface, account forms, overview, contacts, documents, imports, and campaign settings.
+- `app/workspace.js`: client interface, account forms, overview, knowledge graph, contacts, documents, imports, and campaign settings.
 - `app/sankey.js`: D3 Sankey showing current contact distribution by channel and stage.
+- `app/knowledge-graph.js` and `lib/knowledge-graph.mjs`: interactive network of sponsors grouped by product owner by default; text selector switches exclusively between product owners, contact methods, and stages, with a sliding underline; node focus, search, dragging, pan, zoom, and a saved-context inspector.
 - `lib/model.mjs`: validation, display stage labels, contact totals, and Sankey data.
 - `lib/db.mjs`: Neon reads and transactional workspace mutations.
 - `lib/auth.mjs`: phone normalization, password hashing, signed sessions, and authorization.
@@ -36,11 +37,12 @@ The website handles campaign overview, contact management, bulk imports, relatio
 ## Implemented interface
 
 - Sign-in and sidebar branding use `assets/logo.png` through a static Next.js image import; the same asset supplies browser and Apple touch icons.
-- Navigation: Overview, Contacts, Documents, Imports, Campaign settings.
+- Navigation: Overview, Knowledge graph, Contacts, Documents, Imports, Campaign settings, Connected apps.
+- Knowledge graph links shared relationship nodes using explicit stored fields. Product owners anchor the default view. Click text labels to slide between product owners, contact methods, or stages; only one grouping is active. Organizations are excluded from the graph. Industries, lead types, campaign nodes, next actions, documents, and history are excluded. Relationship notes live in the inspector; original records remain available in their respective sections.
 - Overview counts contacts, responses, completed outcomes, and overdue follow-ups. Optional targets count outcomes, not dollars.
 - Overview shows a daily summary of recorded contact activity with a direct link to the Sankey pipeline.
 - Sankey widths count contacts. It shows a current snapshot, not historical conversion rates. Stage history remains separate.
-- Contact editor supports a name or organization, address, channel, category, owner, notes, reason for outreach, next action/date, and activity history. Organization is optional.
+- Contact editor supports a name or organization, address, phone, channel, lead type, category, owner, notes, reason for outreach, next action/date, and activity history. Organization is optional.
 - Visible stages: Identified, Ready, Contacted, Replied, Follow-up, Completed, Declined.
 - Campaign settings include name, deadline, optional context/location, audience description, objective, outreach guidelines, and optional outcome target.
 - CSV/XLSX import supports column mapping, validation preview, duplicate skipping, and at most 500 contacts per file. XLSX uses the first sheet and cached formula results. Contact exports omit financial fields.

@@ -1,10 +1,10 @@
 # Ambassador
 
-Ambassador is a general-purpose outreach campaign planning platform. It can help track party attendees, organize a wedding, coordinate other events, manage recruiter outreach, support startup go-to-market work, or organize political campaign outreach. The common workflow is remembering people and context, deciding the next action, coordinating follow-ups, and making progress visible.
+Ambassador is a shared outreach and planning second brain. It connects people, organizations, projects, goals, history, source material, and next actions so a team can remember context and coordinate follow-through. It can help track party attendees, organize a wedding, coordinate other events, manage recruiter outreach, support startup go-to-market work, or organize political campaign outreach.
 
 The current demo highlights hackathon sponsorship with 26 fictional sponsor accounts. Sponsor spreadsheets, relationship strategies, follow-ups, proposals, and the sponsorship Sankey demonstrate that broader workflow. Wedding logistics, attendance tracking, recruiter pipelines, startup campaigns, and political campaign tooling are product use cases, not features implemented by this sponsorship POC.
 
-The website is the campaign owner's overview and bulk setup area. Photon Spectrum and iMessage are the intended interface for daily outreach, pitching, negotiation assistance, and calendar work. The website preserves context and makes recorded progress inspectable.
+The website is the shared planning workspace and bulk setup area. Its knowledge graph explores sponsor relationships within a campaign, grouped by product owner by default. A text selector switches between product owners, contact methods, and stages. Planning, activity, and private files remain in their respective sections. Photon Spectrum and iMessage are the intended interface for daily outreach, pitching, negotiation assistance, and calendar work. The website preserves context and makes recorded progress inspectable.
 
 The POC uses Neon Postgres for persistent sponsor records, stage history, event settings, and small private documents. Optional Neon Object Storage supports file bytes. Live messaging synchronization is a separate integration.
 
