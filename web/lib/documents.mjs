@@ -34,3 +34,16 @@ export async function documentForOwner(id,phoneNumber) {
   const [file]=await sql`SELECT name,mime,object_key,encode(content,'base64') AS content FROM ambassador_documents WHERE id=${id} AND owner_phone_number=${phone}`;
   return file||null;
 }
+
+export function createDocumentDeletion({db=database,remove=removeObject}={}) {
+  return async function deleteDocument(id,phoneNumber) {
+    const owner=normalizePhone(phoneNumber),sql=db();
+    const [file]=await sql`SELECT object_key FROM ambassador_documents WHERE id=${id} AND owner_phone_number=${owner}`;
+    if(!file)return false;
+    // Remove storage first. If S3 fails, preserve the database row so the user can retry.
+    // S3 DeleteObject is idempotent, so a database failure can also be retried safely.
+    if(file.object_key)await remove(file.object_key);
+    await sql`DELETE FROM ambassador_documents WHERE id=${id} AND owner_phone_number=${owner}`;
+    return true;
+  };
+}
