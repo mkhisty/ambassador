@@ -1,14 +1,12 @@
 # Ambassador response widget
 
 `listen.py` receives a direct Photon iMessage, calls `get_response.py`,
-and sends its response as a Spectrum mini-app card. The card displays the
-response with **Approve**, **Reject**, and **Edit → Approve** actions.
-The compact card initially says **Review message**. After a decision, the
-same card updates to **Approved** or **Rejected**. Close the sheet to return
-to the conversation; automatic native sheet dismissal is not implemented
-because no supported Spectrum web bridge for dismissal was verified.
-Actions only print JSON in the listener terminal; they do not send outreach
-or execute the approved text.
+and sends its response as a Spectrum mini-app card. Message cards support
+**Approve**, **Reject**, and **Edit → Approve**; message decisions are still
+logged only and never send outreach. Calendar proposals use a dedicated review
+card with **Add to Calendar** and **Reject**. Close the sheet to return to the
+conversation; automatic native sheet dismissal is not implemented because no
+supported Spectrum web bridge for dismissal was verified.
 
 `get_response.py` holds the main agent logic: Hermes configuration and runtime
 loading, response generation through `get_response(text, phone_number)`, and logging review
@@ -38,6 +36,21 @@ it does not read attachments, fetch credentials, or send anything. The sender's
 phone number is bound by Python request context, not selected by the model.
 The future database credential lookup and email composition/sending belong in
 the `send_email()` function. Live sending and approval wiring are not implemented.
+
+## Google Calendar through Photon
+
+The worker registers `check_calendar_availability` and
+`propose_calendar_event` with Hermes. Availability responses contain busy blocks
+only. The proposed title and time appear in the Spectrum review card; tapping
+**Add to Calendar** creates an opaque event on the sender's primary Google
+Calendar. Rejecting the proposal creates nothing. The worker calls the website
+with its server-only `AGENT_API_TOKEN`; it never receives Google credentials.
+
+Connect Google in the web workspace and reconnect after granting the
+`calendar.events.freebusy` permission. The worker derives calendar ownership
+from the inbound Photon sender, not a model-selected phone number. The live
+Photon-to-Google path still requires a real sender, running worker, HTTPS review
+URL, and connected test account to verify end to end.
 
 ## Run
 

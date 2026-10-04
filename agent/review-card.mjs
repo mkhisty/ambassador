@@ -1,5 +1,6 @@
 const labels = {
   pending: ['Review message', 'Tap to approve, edit, or reject'],
+  calendar_pending: ['Review calendar event', 'Tap to review and block this time'],
   approve: ['Approved', 'Your response was recorded'],
   edit_approve: ['Approved', 'Edited response recorded'],
   reject: ['Rejected', 'Your response was recorded'],
@@ -20,9 +21,9 @@ export function reviewCard(miniApp, url, state = 'pending') {
 export function createReviewCards(miniApp) {
   const cards = new Map();
   return {
-    async send(space, id, url) {
+    async send(space, id, url, kind = 'message') {
       if (cards.has(id)) throw new Error('Review card already sent');
-      const sent = space.send(reviewCard(miniApp, url));
+      const sent = space.send(reviewCard(miniApp, url, kind === 'calendar' ? 'calendar_pending' : 'pending'));
       cards.set(id, { sent, url, created: Date.now() });
       // Match the widget's 24-hour expiry.
       for (const [key, card] of cards) if (Date.now() - card.created >= 86400000) cards.delete(key);

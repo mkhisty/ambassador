@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from widget import ReviewStore, start_widget_server
 import get_response
+from calendar_tools import calendar_proposal, create_approved_event
 
 HOME = Path.home() / ".hermes"
 SDK_SIDECAR = HOME / "hermes-agent/plugins/platforms/photon/sidecar/index.mjs"
@@ -60,11 +61,12 @@ def listen(token, reviews, public_url):
                 if not text:
                     continue
                 reply = get_response.get_response(text, event.get('sender', {}).get('id'))
-                review_id = reviews.create(reply, event)
+                review_id = reviews.create(reply, event, calendar_event=calendar_proposal.get())
                 post(token, "/send-app", {
                     "reviewId": review_id,
                     "spaceId": event["space"]["id"],
                     "url": public_url + "/review/" + review_id,
+                    "kind": "calendar" if calendar_proposal.get() else "message",
                 })
             except Exception as exc:
                 print(f"Reply failed: {exc}", flush=True)
@@ -99,7 +101,7 @@ def main():
     env["PATH"] = str(Path(node).parent) + os.pathsep + env.get("PATH", "")
     reviews = ReviewStore(emit=get_response.handle_decision, on_decision=lambda review_id, result: post(token, '/update-app', {
         'reviewId': review_id, 'action': result['action'],
-    }))
+    }), on_calendar_approve=create_approved_event)
     server = start_widget_server(reviews, env.get("WIDGET_BIND", "127.0.0.1"),
                                  int(env.get("WIDGET_PORT", "8792")))
     proc = None

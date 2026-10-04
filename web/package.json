@@ -10,6 +10,7 @@
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
     "files:migrate": "node --env-file-if-exists=.env.local scripts/migrate-files.mjs",
     "db:check": "node --env-file-if-exists=.env.local scripts/check-neon.mjs",
+    "db:check-google": "node --env-file-if-exists=.env.local scripts/check-google-storage.mjs",
     "test:document-api": "node --env-file-if-exists=.env.local scripts/check-document-api.mjs",
     "db:setup-owner": "node --env-file-if-exists=.env.local scripts/setup-owner.mjs",
     "db:seed-demo": "node --env-file-if-exists=.env.local scripts/seed-demo.mjs",

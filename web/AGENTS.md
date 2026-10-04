@@ -16,7 +16,7 @@ Updated October 4, 2026. This file applies to the `web/` application. Preserve t
 
 Ambassador is a general-purpose outreach campaign planning platform. Use campaigns, contacts, audiences, outreach, responses, follow-ups, and outcomes in the interface. Party invitations, weddings, recruiting, startup go-to-market work, and political campaigns are possible use cases. The sample data demonstrates hackathon outreach; sponsorship is not the product's navigation or core metric model.
 
-The website handles campaign overview, contact management, bulk imports, relationship context, follow-up planning, and private document uploads. Photon Spectrum/iMessage is the intended daily conversation interface. Do not claim this website sends messages, runs negotiations, or creates calendar entries: those integrations are not active here.
+The website handles campaign overview, contact management, bulk imports, relationship context, follow-up planning, private document uploads, Google account linking, Gmail draft creation, and explicit Calendar event creation. Photon Spectrum/iMessage remains the intended daily conversation interface. The worker does not yet invoke Gmail/Calendar actions, send email, or schedule proactive messages.
 
 ## Stack and files
 
@@ -56,6 +56,9 @@ The database retains earlier naming for compatibility. Do not rename tables, API
 - `ambassador_user_companies`: many-to-many profile/contact-account associations.
 - `ambassador_activities`: contact stage/note history with timestamps.
 - `ambassador_documents`: UUID, filename/type/size, optional contact link, owner phone foreign key, and either Postgres bytes or an object key. Owner/time lookup is indexed.
+- `ambassador_google_oauth_states`: hashed, one-time OAuth state bound to a phone account with a short expiry.
+- `ambassador_google_connections`: one Google identity per phone account; refresh tokens are AES-256-GCM encrypted with `GOOGLE_TOKEN_ENCRYPTION_KEY`.
+- `ambassador_outreach_drafts`: owner/contact-scoped email drafts with optional Gmail draft ID. One open draft per contact/account.
 
 Existing API fields are `event`, `sponsors`, and `sponsorId`. Stored stages remain Qualified, Negotiating, and Committed where the UI displays Ready, Follow-up, and Completed. Earlier financial fields are retained in legacy records but are not campaign controls or metrics. Contact/campaign data is currently shared among workspace accounts; only documents are private per account. This is not a multi-campaign or fully tenant-isolated application.
 
@@ -84,8 +87,14 @@ Existing API fields are `event`, `sponsors`, and `sponsorId`. Stored stages rema
 - `AGENT_API_TOKEN` enables privileged server-to-server workspace access. It does not grant access to the private browser document endpoints. Without a phone session, workspace responses contain no user documents.
 - `GET /api/agent/context?phoneNumber=...`: worker bearer token required; returns the selected phone's profile, shared campaign, linked contacts/activity, and owned document metadata. Unknown profiles return 404. Authentication data and other user profiles are excluded.
 - `GET /api/agent/context/documents/[id]?phoneNumber=...`: the same worker authentication and SQL owner lookup precede either Postgres or S3 byte reads. Unknown/foreign IDs return 404. All context responses use private, no-store caching.
+- Google OAuth is signed-in-user-only. `POST /api/google/connect` starts authorization; `/api/google/callback` consumes one-time state and saves an encrypted refresh token. `GET /api/google/status` returns connection metadata; `DELETE /api/google/connection` revokes and removes the local token.
+- `POST /api/google/gmail/drafts` creates or updates a Gmail draft from reviewed fields and stores its Gmail ID. It never sends email.
+- `POST /api/google/calendar/events` creates an event on the connected account's primary calendar after an explicit organizer action.
+- OAuth requests `gmail.compose`, `calendar.events.freebusy`, and `calendar.events.owned`. Google Cloud must enable Gmail API and Calendar API. Personal accounts require an External audience and, in Testing, must be added as test users. Reconnect after new scopes are added.
+- `POST /api/agent/google/calendar/freebusy` checks the selected phone owner's primary calendar and returns busy intervals only. `POST /api/agent/google/calendar/events` creates an opaque event using an approval ID for safe retries. Both require the server-only agent bearer token and a phone number supplied by the worker's trusted Photon sender context.
+- Photon schedule requests can check availability and prepare a proposal. The hosted review card displays event details; only its explicit **Add to Calendar** action creates the event. This flow is implemented but still needs live Photon-to-Google end-to-end verification.
 - The worker token is privileged to select any profile; only the trusted listener supplies the incoming sender identity. Never expose that token in widgets or browser code. Phone ownership remains unverified.
-- `agent/fetch_context.py` refreshes local snapshots through these read-only routes before Hermes drafts. Decisions still only log; live outreach and workspace write-back are unfinished.
+- `agent/fetch_context.py` refreshes local snapshots through the context routes before Hermes drafts. Calendar proposals require review approval; Gmail sending and workspace write-back are unfinished.
 
 ## Files, environment, and demo
 

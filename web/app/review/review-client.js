@@ -18,6 +18,9 @@ export default function ReviewClient({contactId}) {
   const [status,setStatus]=useState('Loading your private workspace…');
   const [draft,setDraft]=useState(null);
   const [saving,setSaving]=useState(false);
+  const [gmailBusy,setGmailBusy]=useState(false);
+  const [gmailUrl,setGmailUrl]=useState('');
+  const [gmailError,setGmailError]=useState('');
   const [saved,setSaved]=useState(false);
   const [saveError,setSaveError]=useState('');
   const [demoMode,setDemoMode]=useState(false);
@@ -61,6 +64,12 @@ export default function ReviewClient({contactId}) {
     catch(error){setSaveError(error.message);}
     finally{setSaving(false);}
   }
+  async function createGmailDraft(){
+    setGmailBusy(true);setGmailError('');setGmailUrl('');
+    try{const response=await fetch('/api/google/gmail/drafts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contactId,recipient:draft.to,to:draft.to,subject:draft.subject,body:draft.body})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Could not create Gmail draft.');setGmailUrl(result.url);setSaved(true);}
+    catch(error){setGmailError(error.message);}
+    finally{setGmailBusy(false);}
+  }
   if(status)return <main className="review-page"><section className="review-card"><a href="/" className="review-back"><ArrowLeft size={16}/>Workspace</a><div className="review-brand">ambassador<span>.</span></div><p className="review-status">{status}</p><a href="/" className="review-cta">Open workspace</a></section></main>;
   if(!contact||!draft)return null;
   return <main className="review-page"><section className="review-card">
@@ -71,8 +80,9 @@ export default function ReviewClient({contactId}) {
     <p className="review-lede">Ambassador prepared a follow-up for {contact.contact||contact.company}. Make any edits, then open it in your email app to review and send.</p>
     <div className="review-private"><ShieldCheck size={16}/>{demoMode?'Browser demo · saved on this device':'Private workspace · signed-in account only'}</div>
     <div className="review-fields"><label>To<input value={draft.to} onChange={e=>editDraft({...draft,to:e.target.value})} placeholder="Add recipient email" type="email"/></label><label>Subject<input value={draft.subject} onChange={e=>editDraft({...draft,subject:e.target.value})}/></label><label>Message<textarea rows={9} value={draft.body} onChange={e=>editDraft({...draft,body:e.target.value})}/></label></div>
-    <div className="review-actions"><button className="review-cta review-save" disabled={saving} onClick={saveDraft}><Check size={16}/>{saving?'Saving…':saved?'Save changes':'Save draft'}</button><a className={`review-cta review-email ${!mailto?'disabled':''}`} href={mailto||undefined}><Mail size={16}/>Open email app<ExternalLink size={14}/></a><span>{saved?demoMode?'Saved in this browser.':'Saved to your private Neon workspace.':'Save edits here to keep them after closing.'}</span></div>
+    <div className="review-actions"><button className="review-cta review-save" disabled={saving} onClick={saveDraft}><Check size={16}/>{saving?'Saving…':saved?'Save changes':'Save draft'}</button>{!demoMode&&<button className="review-cta review-save" disabled={gmailBusy} onClick={createGmailDraft}><Mail size={16}/>{gmailBusy?'Creating Gmail draft…':'Create Gmail draft'}</button>}{gmailUrl&&<a className="review-cta review-email" href={gmailUrl} target="_blank" rel="noreferrer">Open draft in Gmail<ExternalLink size={14}/></a>}<a className={`review-cta review-email ${!mailto?'disabled':''}`} href={mailto||undefined}><Mail size={16}/>Open email app<ExternalLink size={14}/></a><span>{saved?demoMode?'Saved in this browser.':'Saved to your private Neon workspace.':'Save edits here to keep them after closing.'}</span></div>
     {saveError&&<p className="review-error" role="alert">{saveError}</p>}
+    {gmailError&&<p className="review-error" role="alert">{gmailError}</p>}
     <p className="review-note">{demoMode?'Browser demo drafts stay on this device. ': 'Saved drafts stay in Neon under your account. '}Opening the email app is a separate handoff; Gmail linking and direct Gmail draft creation are not connected.</p>
   </section></main>;
 }

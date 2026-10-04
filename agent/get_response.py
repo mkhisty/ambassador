@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from fetch_context import fetch_context
 from send_email import email_owner, register_email_tool
+from calendar_tools import calendar_owner, calendar_proposal, register_calendar_tools
 
 HERMES_HOME = Path.home() / '.hermes'
 
@@ -16,6 +17,7 @@ def load_hermes():
     from hermes_cli.config import load_config_readonly, split_model_config_default
     from hermes_cli.runtime_provider import resolve_runtime_provider
     register_email_tool()
+    register_calendar_tools()
     return AIAgent, load_config_readonly, split_model_config_default, resolve_runtime_provider
 
 
@@ -40,6 +42,11 @@ def generate_response(text, context_directory, *, phone_number=None):
         'text, and any attachment_paths, cc, bcc, or reply_to. The tool is currently '
         'a placeholder and never sends email. Explain that the email is proposed '
         'and not sent. Do not use other tools to send messages or email.'
+        ' For scheduling requests, use check_calendar_availability before suggesting '
+        'a time. It reveals busy intervals only. When the user selects a time, call '
+        'propose_calendar_event with the exact title, timezone-aware start and end, '
+        'and IANA time zone. The Photon review card will ask the user before creating '
+        'an event. Never claim an event is scheduled until the user approves it.'
     )
     AIAgent, load_config_readonly, split_model_config_default, resolve_runtime_provider = load_hermes()
     model_config = load_config_readonly()['model']
@@ -57,7 +64,9 @@ def generate_response(text, context_directory, *, phone_number=None):
         ephemeral_system_prompt=instructions,
         cwd=str(context_directory),
     )
+    calendar_proposal.set(None)
     owner_token = email_owner.set(phone_number)
+    calendar_owner_token = calendar_owner.set(phone_number)
     try:
         result = agent.run_conversation(user_message=text)
         reply = (result.get('final_response') or '').strip()
@@ -68,6 +77,7 @@ def generate_response(text, context_directory, *, phone_number=None):
         try:
             agent.close()
         finally:
+            calendar_owner.reset(calendar_owner_token)
             email_owner.reset(owner_token)
 
 

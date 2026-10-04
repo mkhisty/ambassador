@@ -1,4 +1,6 @@
 import unittest
+import json
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import get_response
@@ -38,9 +40,9 @@ class ResponseTests(unittest.TestCase):
         agent.close.assert_called_once()
         runtime[3].assert_called_once_with(requested='test-provider', target_model='test-model')
         self.assertEqual(runtime[0].call_args.kwargs['model'], 'resolved-model')
-        self.assertEqual(runtime[0].call_args.kwargs['cwd'], '/tmp/user-context')
+        self.assertEqual(runtime[0].call_args.kwargs['cwd'], str(Path('/tmp/user-context').resolve()))
         instructions = runtime[0].call_args.kwargs['ephemeral_system_prompt']
-        self.assertIn('/tmp/user-context', instructions)
+        self.assertIn(json.dumps(str(Path('/tmp/user-context').resolve())), instructions)
         self.assertIn('Inspect relevant files', instructions)
         self.assertIn('missing or empty', instructions)
 

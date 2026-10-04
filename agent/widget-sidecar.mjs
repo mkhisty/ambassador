@@ -42,7 +42,7 @@ const server = http.createServer(async (req, res) => {
       raw += chunk;
       if (Buffer.byteLength(raw) > 16384) return json(413, { ok: false });
     }
-    const { spaceId, url, reviewId, action } = JSON.parse(raw);
+    const { spaceId, url, reviewId, action, kind } = JSON.parse(raw);
     if (typeof reviewId !== 'string' || !reviewId) throw new Error('Review ID required');
     if (req.url === '/update-app') {
       await cards.update(reviewId, action);
@@ -53,7 +53,7 @@ const server = http.createServer(async (req, res) => {
     if (!space) throw new Error('No inbound conversation for this card');
     // A normal app card opens the widget in a sheet when tapped, instead of
     // squeezing the controls into the transcript's inline bubble.
-    const sent = await cards.send(space, reviewId, url);
+    const sent = await cards.send(space, reviewId, url, kind);
     json(200, { ok: true, messageId: sent?.id });
   } catch (error) {
     json(400, { ok: false, error: error.message });

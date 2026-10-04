@@ -5,7 +5,7 @@ import { reviewCard, createReviewCards } from './review-card.mjs';
 const miniApp = (url, options) => ({ build: async () => ({ type: 'app', url: async () => url, ...options }) });
 
 test('cards have explicit captions and open as sheets', async () => {
-  for (const [state, title] of [['pending', 'Review message'], ['approve', 'Approved'], ['edit_approve', 'Approved'], ['reject', 'Rejected']]) {
+  for (const [state, title] of [['pending', 'Review message'], ['calendar_pending', 'Review calendar event'], ['approve', 'Approved'], ['edit_approve', 'Approved'], ['reject', 'Rejected']]) {
     const card = await reviewCard(miniApp, 'https://example.test/review/1', state).build();
     assert.equal(card.live, false);
     assert.equal((await card.layout()).caption, title);

@@ -22,10 +22,12 @@ user review → approved action → provider result → workspace update.
 ## Current implementation
 
 The website has campaign settings, contact management, pipeline charts,
-follow-ups, CSV/XLSX imports, and documents. Accounts use phone/password login
-and invitation-based signup. Documents are private per account; campaign and
-contact data currently form one shared workspace. New live uploads require
-private S3 storage; existing Postgres-backed documents remain readable.
+follow-ups, CSV/XLSX imports, documents, Google OAuth account linking, Gmail
+draft creation, and explicit Calendar event creation. Accounts use
+phone/password login and invitation-based signup. Documents are private per
+account; campaign and contact data currently form one shared workspace. New
+live uploads require private S3 storage; existing Postgres-backed documents
+remain readable.
 
 The agent receives direct iMessages, calls Hermes, and returns a “Review
 message” card. Its sheet supports Approve, Reject, and Edit → Approve; the
@@ -43,11 +45,17 @@ snapshot directory. `agent/send_email.py` registers
 a Hermes tool that accepts email fields and attachment paths but returns
 `not_sent`; it does not fetch credentials, read attachments, or send email.
 
-The website-to-agent context path is connected. Approval still only logs decisions;
-email sending and workspace write-back remain unfinished. Phone ownership is not
-verified. S3 connectivity and production hosting remain unverified according
-to component documentation. Historical test results are not evidence that
-later edits or live integrations work; run checks relevant to each change.
+The website-to-agent context path is connected. Hermes can check Google
+Calendar free/busy through the worker API and prepare an event proposal; the
+Photon review card creates an opaque primary-calendar event only after explicit
+approval. Gmail drafts remain website-only, and email is never sent
+automatically. Google OAuth and Neon token storage are in place; the developer
+has switched to an External testing audience and connected a test account.
+Existing connections must reconnect once to grant the added free/busy scope.
+Live Photon-to-Google end-to-end delivery still needs verification. Phone
+ownership is not verified. S3 connectivity and production hosting remain
+unverified. Historical test results are not evidence that later edits or live
+integrations work; run checks relevant to each change.
 
 ## Hermes setup for a fresh clone
 
@@ -120,8 +128,9 @@ Remaining work to make developer setup reliably clone-and-run:
 
 ## Website work remaining (`web/`)
 
-- [ ] **Email account connection:** Add OAuth onboarding, connection status,
-  disconnect/reconnect, and secure storage of each user's email tokens.
+- [x] **Google account connection:** OAuth onboarding, connection status,
+  disconnect/reconnect, and encrypted per-phone refresh-token storage. Google
+  app audience configuration and first user consent remain external steps.
 - [x] **Agent context API:** Separate token-authenticated routes expose the
   selected phone's profile, shared campaign, linked contacts/activity, and
   owned document downloads. Browser document routes still require a phone session.
@@ -130,8 +139,9 @@ Remaining work to make developer setup reliably clone-and-run:
 - [ ] **Workspace permissions:** Define access and mutation permissions for
   shared campaigns and contacts. Add tenant isolation if accounts require
   separate workspaces.
-- [ ] **Outreach records:** Persist structured drafts, revisions, approvals,
-  send attempts, provider results, and received replies.
+- [ ] **Outreach records:** Basic per-contact drafts and Gmail draft IDs persist;
+  revisions, approval decisions, send attempts, provider results, and received
+  replies still need a complete lifecycle.
 - [ ] **Storage verification:** Configure the expected `S3_*` variables,
   verify uploads/downloads, and migrate existing Postgres file bytes if needed.
 - [ ] **Deployment:** Deploy the website, configure production secrets, run
@@ -156,6 +166,12 @@ Remaining work to make developer setup reliably clone-and-run:
   the message, and call the email provider. The current tool is a stub;
   replacing it with immediate sending during draft generation would bypass
   the intended approval flow.
+- [x] **Agent Calendar actions:** Check free/busy without revealing event details;
+  prepare an event proposal and create an opaque calendar hold only after the
+  user approves it in the Photon review card. Reconnect Google for the added
+  free/busy scope; live end-to-end delivery remains unverified.
+- [ ] **Agent Gmail drafts:** Expose connected Gmail draft creation to Hermes
+  through an explicit review action.
 - [ ] **Duplicate prevention and recovery:** Persist processing state,
   deduplicate approvals, and reconcile uncertain provider attempts before
   retrying.

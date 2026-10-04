@@ -47,3 +47,33 @@ CREATE TABLE IF NOT EXISTS ambassador_documents (
 );
 ALTER TABLE ambassador_documents ADD COLUMN IF NOT EXISTS owner_phone_number text REFERENCES ambassador_users(phone_number) ON UPDATE CASCADE;
 CREATE INDEX IF NOT EXISTS ambassador_document_owner ON ambassador_documents(owner_phone_number,created_at DESC);
+CREATE TABLE IF NOT EXISTS ambassador_google_oauth_states (
+  state_hash text PRIMARY KEY CHECK (state_hash ~ '^[a-f0-9]{64}$'),
+  phone_number text NOT NULL REFERENCES ambassador_users(phone_number) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ambassador_google_oauth_state_expiry ON ambassador_google_oauth_states(expires_at);
+CREATE TABLE IF NOT EXISTS ambassador_google_connections (
+  phone_number text PRIMARY KEY REFERENCES ambassador_users(phone_number) ON DELETE CASCADE,
+  google_subject text NOT NULL,
+  google_email text NOT NULL,
+  scopes text[] NOT NULL DEFAULT '{}',
+  refresh_token_ciphertext text NOT NULL,
+  refresh_token_iv text NOT NULL,
+  refresh_token_tag text NOT NULL,
+  connected_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS ambassador_outreach_drafts (
+  id text PRIMARY KEY,
+  owner_phone_number text NOT NULL REFERENCES ambassador_users(phone_number) ON DELETE CASCADE,
+  sponsor_id text NOT NULL REFERENCES ambassador_sponsors(id) ON DELETE CASCADE,
+  recipient text NOT NULL,
+  subject text NOT NULL DEFAULT '',
+  body text NOT NULL,
+  status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','rejected','sent')),
+  google_draft_id text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ambassador_outreach_one_open_draft ON ambassador_outreach_drafts(owner_phone_number,sponsor_id) WHERE status='draft';

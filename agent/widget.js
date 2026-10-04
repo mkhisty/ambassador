@@ -23,7 +23,8 @@ async function submit(action) {
     return;
   }
   document.querySelectorAll('button').forEach(button => button.disabled = true);
-  el('status').textContent = 'Recording your response…';
+  const calendar = Boolean(el('calendar-details') && !el('calendar-details').hidden);
+  el('status').textContent = calendar && action === 'approve' ? 'Adding event to your calendar…' : 'Recording your response…';
   try {
     const response = await fetch(location.pathname, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -31,12 +32,16 @@ async function submit(action) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not record response');
+    if (result.event && result.event.url) {
+      el('calendar-link').href = result.event.url;
+      el('calendar-link').hidden = false;
+    }
     if (action === 'edit_approve') el('response').textContent = el('text').value;
     finish();
-    const label = action === 'reject' ? 'Rejected' : 'Approved';
+    const label = calendar ? (action === 'reject' ? 'Calendar event not added' : 'Event added to Calendar') : (action === 'reject' ? 'Rejected' : 'Approved');
     document.querySelector('h1').textContent = label;
     document.title = label + ' · Ambassador';
-    el('status').textContent = 'Your response was recorded. Close this view to return to iMessage.';
+    el('status').textContent = calendar ? (action === 'reject' ? 'No event was created.' : 'Your event was created and blocks this time.') : 'Your response was recorded. Close this view to return to iMessage.';
   } catch (error) {
     el('status').textContent = error.message + ' Reload to check its status.';
   } finally {

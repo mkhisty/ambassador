@@ -34,6 +34,14 @@ To explicitly load this scenario into your configured Neon project, run `npm run
 
 The POC supports a single shared campaign with individual phone/password accounts and signed, HTTP-only, one-day sessions. Use a strong random password. Production accounts should use a managed authentication provider, phone verification where required, and campaign-level permissions. Set rate limits on the sign-in endpoint in your hosting platform before broadly distributing a private workspace URL. Credential configuration and live Neon round-trip verification require your account; no Neon project is provisioned automatically.
 
+## Connect Gmail and Calendar
+
+1. In Google Cloud, enable the Gmail API and Google Calendar API. Configure Google Auth Platform with an **External** audience for personal Gmail accounts and add the account as a test user while the app is in Testing.
+2. Create a Web application OAuth client. Add `http://127.0.0.1:3000/api/google/callback` as an authorized redirect URI and set the matching `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` in `.env.local` (or Vercel environment variables). Generate `GOOGLE_TOKEN_ENCRYPTION_KEY` as base64-encoded 32 random bytes.
+3. Add Gmail compose, Calendar free/busy, and owned-calendar event scopes in Google Auth Platform. Run `npm run db:migrate`, restart the web app, sign in, and open **Connected apps → Connect Google**.
+
+Ambassador stores each account's Google refresh token encrypted in Neon. Users can disconnect/revoke the grant or reconnect to approve newly added scopes. The review page can create or update a Gmail draft; the user opens that draft in Gmail and presses Send there. Photon can check the primary calendar's free/busy intervals, then present an event proposal in its review card. Only **Add to Calendar** creates an opaque event that blocks the time; rejection creates nothing. Events are created on the connected account's primary calendar without inviting attendees. Gmail compose is a restricted OAuth scope; public release may require Google verification and a security assessment. In Testing, Google may expire refresh grants after seven days. Use `npm run db:check-google` to test state consumption, ownership, encryption, and cleanup without contacting Google.
+
 ## Document storage
 
 Documents have an indexed `owner_phone_number` foreign key to `ambassador_users.phone_number`. Uploads assign this from the signed login session, ignoring any owner submitted by the browser. Workspace listings and ID-based downloads are filtered by that owner. `GET /api/documents?phoneNumber=7344199492` returns that owner's document metadata after login; a different requested phone returns 403. Unknown or another owner's document ID returns 404. Both Postgres and object-store files use the same ownership checks.
@@ -78,6 +86,20 @@ including legacy Postgres bytes and private S3 objects. Unknown accounts/files
 return 404, invalid phones 400, and missing/wrong tokens 401. Responses are
 private and uncached. These are separate worker endpoints; browser file
 routes still require the owner session. Keep the privileged worker token server-side.
+
+Google Calendar tools use the sender phone bound by the Photon worker and the
+same bearer token:
+
+```http
+POST /api/agent/google/calendar/freebusy
+POST /api/agent/google/calendar/events
+```
+
+The free/busy endpoint returns busy intervals without event titles or details.
+The event endpoint requires the review ID and is called only after the user taps
+**Add to Calendar** in the Photon review card. Repeating the same approval is
+idempotent. Google connection must include the `calendar.events.freebusy` scope;
+use **Connected apps → Reconnect Google permissions** after the app adds it.
 
 Configure `AMBASSADOR_WEB_URL` in `agent/.env.local` with the website origin
 (localhost port 3000 by default) and the same `AGENT_API_TOKEN`. On a local clone,

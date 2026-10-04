@@ -70,6 +70,29 @@ class ReviewTests(unittest.TestCase):
             self.store.submit(key, {'action': 'approve'})
         self.assertEqual(self.responses, [])
 
+    def test_calendar_is_created_only_after_explicit_approval(self):
+        created = []
+        store = ReviewStore(self.responses.append, lambda: self.now,
+                            on_calendar_approve=lambda key, phone, event: created.append((key, phone, event)) or {'url': 'https://calendar.google.com/event'})
+        event = {'summary': '<Recruiter call>', 'start': '2026-10-04T14:30:00-04:00', 'end': '2026-10-04T15:00:00-04:00', 'timeZone': 'America/New_York'}
+        key = store.create('Proposed time', self.event, calendar_event=event)
+        page = render(store.get(key))
+        self.assertIn('Add to Calendar', page)
+        self.assertIn('&lt;Recruiter call&gt;', page)
+        self.assertEqual(created, [])
+        result = store.submit(key, {'action': 'approve'})
+        self.assertEqual(created, [(key, '+12025550100', event)])
+        self.assertEqual(result['calendar_event']['url'], 'https://calendar.google.com/event')
+
+    def test_rejecting_calendar_proposal_never_creates_event(self):
+        created = []
+        store = ReviewStore(self.responses.append, lambda: self.now,
+                            on_calendar_approve=lambda *args: created.append(args))
+        key = store.create('Proposed time', self.event, calendar_event={'summary': 'Call'})
+        result = store.submit(key, {'action': 'reject'})
+        self.assertEqual(result['action'], 'reject')
+        self.assertEqual(created, [])
+
     def test_http_confirms_decision_before_card_update_finishes(self):
         started = threading.Event()
         release = threading.Event()
@@ -86,7 +109,7 @@ class ReviewTests(unittest.TestCase):
         request = urllib.request.Request(url, data=b'{"action":"approve"}',
                                          headers={'Content-Type': 'application/json'})
         with urllib.request.urlopen(request, timeout=1) as response:
-            self.assertEqual(json.load(response), {'ok': True, 'action': 'approve'})
+            self.assertEqual(json.load(response), {'ok': True, 'action': 'approve', 'event': None})
         self.assertTrue(started.wait(timeout=1))
         self.assertFalse(release.is_set())
         self.assertEqual(self.store.get(key)['result']['action'], 'approve')

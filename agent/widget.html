@@ -16,20 +16,26 @@
   button { border: 0; border-radius: 12px; padding: 12px 16px; font: inherit; font-weight: 600; cursor: pointer; background: light-dark(#edeef4,#3b3c47); color: inherit; }
   .primary { background: #5351e8; color: white; }
   button:disabled { opacity: .5; cursor: default; }
+  .calendar { margin: 16px 0; padding: 12px; border-radius: 12px; background: light-dark(#f2f3f7,#30313a); }
+  dl { display: grid; grid-template-columns: 90px 1fr; gap: 8px 12px; line-height: 1.4; margin: 0; }
+  dt { color: light-dark(#6c6d7a,#b0b1c0); }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .calendar-link { display: inline-block; margin-top: 10px; color: #7775ff; }
   [hidden] { display: none !important; }
   #status { font-size: 14px; line-height: 1.5; }
 </style>
 <main data-finished="__FINISHED__">
-  <small>AMBASSADOR · RESPONSE REVIEW</small>
+  <small>AMBASSADOR · __KIND__</small>
   <h1>__TITLE__</h1>
   <pre id="response">__RESPONSE__</pre>
+  <section class="calendar" id="calendar-details" __CALENDAR_HIDDEN__>__CALENDAR_DETAILS__</section>
   <section id="editor" hidden>
     <label for="text">Edit response</label>
     <textarea id="text" maxlength="20000"></textarea>
   </section>
   <div class="actions" id="review-actions">
-    <button class="primary" id="approve">Approve</button>
-    <button id="edit">Edit</button>
+    <button class="primary" id="approve">__APPROVE_LABEL__</button>
+    <button id="edit" __EDIT_HIDDEN__>Edit</button>
     <button id="reject">Reject</button>
   </div>
   <div class="actions" id="edit-actions" hidden>
@@ -37,7 +43,8 @@
     <button id="cancel">Cancel</button>
   </div>
   <p id="status" role="status" aria-live="polite">__STATUS__</p>
-  <small>Demo: your choice is recorded. No outreach is sent.</small>
+  <a class="calendar-link" id="calendar-link" hidden target="_blank" rel="noreferrer">Open in Google Calendar</a>
+  <small>Messages are never sent automatically. Calendar events are created only after approval.</small>
 </main>
 <script src="/widget.js" defer></script>
 </html>

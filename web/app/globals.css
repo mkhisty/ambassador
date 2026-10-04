@@ -196,6 +196,19 @@ td small { display: block; font-size: 11px; color: var(--muted); margin-top: 3px
 .backend-card>p { color: var(--muted); font-size: 13px; line-height: 1.75; margin: 12px 0 18px; max-width: 65ch; }
 .backend-card>div { display: flex; align-items: center; gap: 7px; color: var(--green); font-size: 12px; margin: 16px 0; }
 .backend-card>small { color: var(--muted); }
+.google-connection { margin: 0; padding: 0; border: 0; }
+.google-services, .google-linked, .google-linked>span { display: flex; align-items: center; gap: 12px; }
+.google-services { color: var(--muted); font-size: 12px; margin: 16px 0; }
+.google-services span, .google-linked>span, .google-muted, .google-open-link { display: inline-flex; align-items: center; gap: 7px; }
+.google-linked { justify-content: space-between; margin: 18px 0; color: var(--green); font-size: 12px; }
+.google-linked strong { color: var(--ink); }
+.google-muted { color: var(--muted); font-size: 12px; margin: 12px 0; }
+.google-error { color: #a33b31; font-size: 12px; margin: 12px 0; }
+.google-event-form { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcf9; }
+.google-event-form>div { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.google-event-form label { display: block; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
+.google-event-form input { display: block; width: 100%; margin-top: 6px; padding: 9px; border: 1px solid #c9d0c0; border-radius: 5px; font: inherit; }
+.google-open-link { color: var(--green); font-size: 12px; margin: 12px 0; }
 .modal { width: 650px; max-width: calc(100% - 40px); max-height: 90vh; padding: 0; border: 0; border-radius: 12px; box-shadow: 0 20px 70px #17221630; background: #fff; color: var(--ink); }
 .modal.wide { width: 780px; }
 .modal::backdrop { background: #1c2b235c; }
