@@ -18,7 +18,7 @@ def draft_message(event, lead):
             f"Hi {lead['contact'].split()[0]},\n\n"
             f"I'm {event['organizer']}, organizing {event['name']} on {event['date']} "
             f"at {event['location']} for an expected {event['expected_attendees']} participants.\n\n"
-            f"Following our conversation about student developer tools, would "
+            f"Based on the recorded sponsor fit, would "
             f"{lead['company']} consider contributing {lead['ask']}? "
             f"Our proposed sponsor benefits include {event['sponsor_benefits']}.\n\n"
             "Would you be open to a brief conversation about the fit?\n\n"
@@ -26,7 +26,7 @@ def draft_message(event, lead):
         )
     elif lead['channel'] == 'linkedin':
         body = (
-            f"Hi {lead['contact'].split()[0]} — a volunteer suggested we connect. "
+            f"Hi {lead['contact'].split()[0]} — "
             f"I'm organizing {event['name']} on {event['date']}. Would your team "
             f"be interested in mentoring and contributing {lead['ask']}? "
             "Happy to share the event details. [FICTIONAL DEMO]"
@@ -80,18 +80,18 @@ def main():
     (output / 'drafts.json').write_text(json.dumps(drafts, indent=2), encoding='utf-8')
     ledger_path = output / 'ledger.json'
     ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
-    email = drafts[0]
+    email = next(draft for draft in drafts if draft['channel'] == 'email')
     approval = {'draft_hash': digest(email), 'organizer': 'Alex Morgan', 'mock': True}
     result = queue_mock_email(email, approval, output / 'outbox', ledger)
     ledger_path.write_text(json.dumps(ledger, indent=2), encoding='utf-8')
     transcript = (
         '# SIMULATED iMessage conversation — Spectrum is not connected\n\n'
         'Organizer: Check our sponsorship leads and prepare the next outreach.\n\n'
-        f"Ambassador: {len(drafts)} leads are ready; Orbit Hardware is already in contract review. "
-        'Northstar Cloud is a fit based on its stated interest in student developer tools.\n\n'
+        f"Ambassador: {len(leads)} fictional accounts tracked; {len(drafts)} are qualified for initial outreach. "
+        f"Cedar Labs is in contract review. Selected {next(l['company'] for l in leads if l['id'] == email['lead_id'])} based on recorded fit.\n\n"
         f"To: {email['to']}\n\nSubject: {email['subject']}\n\n{email['body']}\n\n"
         'Ambassador: Approve this email, edit it, or reject it?\n\n'
-        'Organizer (simulated): Approve lead-001.\n\n'
+        f"Organizer (simulated): Approve {email['lead_id']}.\n\n"
         'Ambassador: Mock email saved to the local outbox. No email was delivered.\n'
     )
     (output / 'imessage-transcript.md').write_text(transcript, encoding='utf-8')

@@ -1,5 +1,4 @@
 {
-  "mock": true,
   "event": {
     "name": "BuildTogether 2026",
     "date": "2026-11-14",
@@ -503,18 +502,6 @@
       "source": "https://example.com/mock-leads/stonebridge-manufacturing",
       "fit": "Manufacturing partnership: connect an approved mentor session, student challenge, or recruiting benefit to this sponsor's stated goals. Validate the exact fit before outreach.",
       "category": "Manufacturing"
-    }
-  ],
-  "contracts": [
-    {
-      "id": "contract-001",
-      "lead_id": "lead-002",
-      "status": "draft_pending_organizer_review",
-      "proposed_contribution": "$4,000 proposed contribution",
-      "proposed_benefits": "Mentor session and organizer-approved recruiting benefits",
-      "document": "contracts/contract-001.md",
-      "signed": false,
-      "next_action": "Organizer reviews proposed terms before sharing."
     }
   ]
 }
