@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ambassador — Built for collective action</title>
+<style>
+:root{color-scheme:dark;--bg:#08090b;--ink:#f3f3ef;--muted:#999ca5;--blue:#91bbff;--line:#30333a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Arial,Helvetica,sans-serif}button{font:inherit}main{height:100svh;overflow-y:auto;scroll-snap-type:y mandatory}section{min-height:100svh;padding:5vh 6vw 7vh;scroll-snap-align:start;display:flex;flex-direction:column;position:relative;overflow:hidden}.top,.bottom{display:flex;justify-content:space-between;align-items:center;font-size:12px;letter-spacing:.13em;text-transform:uppercase}.top{color:var(--muted)}.brand{color:var(--ink);font-weight:700;letter-spacing:.02em}.brand::before{content:'✳';color:var(--blue);font-size:20px;margin-right:10px}.eyebrow{color:var(--blue);font-size:12px;letter-spacing:.18em;text-transform:uppercase;margin:0 0 18px}h1{font-size:clamp(42px,5.5vw,88px);letter-spacing:-.055em;line-height:1.02;margin:0;font-weight:600}h1 span{color:var(--blue)}.intro{margin-top:6vh;max-width:1050px}.subtitle{font-size:clamp(16px,1.5vw,23px);line-height:1.5;color:var(--muted);max-width:660px;margin:23px 0 0}.bottom{margin-top:auto;padding-top:24px;color:var(--muted);font-size:10px;letter-spacing:.08em}.cases{display:grid;grid-template-columns:repeat(4,1fr);gap:25px;margin:7vh 0 5vh}.case{border-top:1px solid var(--line);padding-top:22px}.case svg{width:46px;height:46px;stroke:var(--blue);fill:none;stroke-width:1.5;margin-bottom:22px}.case h2{font-size:22px;letter-spacing:-.035em;margin:0 0 12px}.case p{color:var(--muted);font-size:16px;line-height:1.5;max-width:220px;margin:0}.thesis{font-size:clamp(20px,2.2vw,34px);letter-spacing:-.03em;margin:0}.thesis span{color:var(--muted)}.comparison .intro{margin-top:4vh}.comparison h1{font-size:clamp(38px,4.6vw,70px)}.products{display:grid;grid-template-columns:repeat(3,1fr);margin:4vh 0 0;gap:32px}.product{border-top:1px solid var(--line);padding-top:14px}.product.focus{border-color:var(--blue)}.product h2{font-size:23px;letter-spacing:-.035em;margin:0 0 6px}.focus h2{color:var(--blue)}.product p{font-size:14px;color:var(--muted);margin:0}.charts{width:76%;margin-top:3vh}.chart-title{font-size:13px;letter-spacing:.03em;margin:0 0 5px}.chart svg{width:100%;height:auto;display:block}.chart text{font-family:Inter,Arial,sans-serif;font-size:12px;fill:#999ca5}.chart .grid{fill:none;stroke:#252830;stroke-width:1}.chart .curve{fill:none;stroke-width:3;stroke-linecap:round}.legend{display:flex;gap:18px;font-size:11px;color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:17px;height:2px;background:var(--c);vertical-align:middle;margin-right:6px}.open-layout{display:grid;grid-template-columns:1.2fr 1fr;gap:6vw;align-items:center;flex:1}.open-layout .intro{margin:0}.principles{display:flex;flex-direction:column;gap:26px;margin-top:36px}.principle{border-left:2px solid var(--blue);padding-left:18px}.principle h2{font-size:19px;margin:0 0 7px;letter-spacing:-.025em}.principle p{font-size:15px;color:var(--muted);line-height:1.45;margin:0;max-width:420px}.network{position:relative;aspect-ratio:1;display:grid;place-items:center}.network:before,.network:after{content:'';position:absolute;border:1px solid var(--line);border-radius:50%;width:84%;height:84%}.network:after{width:58%;height:58%}.core{width:40%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 25%,#fff 0%,#eeeff2 42%,#a1a5ae 85%);box-shadow:0 0 70px #91bbff15;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#111;z-index:2}.core strong{font-size:clamp(36px,5vw,74px);font-weight:500;line-height:1}.core small{font-size:11px;letter-spacing:.03em;margin-top:12px}.node{position:absolute;background:var(--bg);border:1px solid var(--line);padding:10px 15px;border-radius:30px;color:var(--muted);font-size:12px;z-index:3}.n1{top:7%;left:30%}.n2{right:0;top:43%}.n3{bottom:7%;left:28%}.n4{left:0;top:42%}.network svg{position:absolute;inset:0;width:100%;height:100%;stroke:var(--line);stroke-width:1}.controls{position:fixed;right:22px;bottom:17px;display:flex;gap:7px;z-index:5}.controls button{border:1px solid #40434b;background:#15171ce8;color:var(--ink);padding:9px 13px;border-radius:6px;cursor:pointer}.controls button:hover{border-color:var(--blue)}button:focus-visible{outline:2px solid var(--blue);outline-offset:3px}@media(max-width:760px){section{padding:28px 24px 80px}.intro{margin-top:45px}.cases{grid-template-columns:1fr 1fr;gap:28px;margin:35px 0}.case h2{font-size:19px}.case p{font-size:14px}.case svg{margin-bottom:10px}.products{gap:12px}.product h2{font-size:20px}.product p{font-size:12px}.charts{width:100%;margin:24px 0}.open-layout{grid-template-columns:1fr;padding-top:45px;gap:25px}.network{max-width:350px;width:100%;margin:auto}.bottom{line-height:1.6;gap:20px;padding-right:65px}.top{font-size:10px}}@media print{@page{size:landscape;margin:0}main{height:auto;overflow:visible}section{height:100vh;min-height:0;break-after:page;print-color-adjust:exact;-webkit-print-color-adjust:exact}.controls{display:none}.intro{margin-top:4vh}.cases{margin:5vh 0}.charts{margin-top:2vh}}
+</style>
+</head>
+<body>
+<main aria-label="Ambassador pitch deck, slides two through four">
+<section id="slide-2" aria-labelledby="title-2">
+<header class="top"><span class="brand">Ambassador</span><span>The opportunity / 02</span></header>
+<div class="intro"><p class="eyebrow">Built for people bringing people together</p><h1 id="title-2">Big missions.<br><span>Small teams.</span></h1><p class="subtitle">Organizers need thoughtful outreach.<br>They rarely have a sales team to run it.</p></div>
+<div class="cases">
+<article class="case"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 28V17l26-7v25L8 28Zm26-12 7-2v16l-7-2M13 29l4 12h7l-4-10"/></svg><h2>Grassroots campaigns</h2><p>Rally volunteers. Reach supporters. Keep local momentum alive.</p></article>
+<article class="case"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m17 12-12 12 12 12m14-24 12 12-12 12M27 7l-6 34"/></svg><h2>Open source</h2><p>Find contributors. Build relationships. Grow a community around the work.</p></article>
+<article class="case"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M28 5 10 27h13l-3 16 18-24H25Z"/></svg><h2>Hackathons</h2><p>Bring sponsors, mentors, and builders into the same room.</p></article>
+<article class="case"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 39 7 23C-3 10 14 2 24 15 34 2 51 10 41 23Z"/></svg><h2>Fundraising</h2><p>Turn shared purpose into donor conversations and lasting support.</p></article>
+</div>
+<p class="thesis">More relationships. <span>Less coordination overhead.</span></p>
+<footer class="bottom"><span>Outreach beyond the sales department</span><span>Ambassador / 02</span></footer>
+</section>
+<section class="comparison" id="slide-3" aria-labelledby="title-3">
+<header class="top"><span class="brand">Ambassador</span><span>Positioning / 03</span></header>
+<div class="intro"><p class="eyebrow">Different tools. Different sweet spots.</p><h1 id="title-3">The space between<br>a helper and a <span>GTM stack.</span></h1></div>
+<div class="products"><article class="product"><h2>Poke</h2><p>General-purpose personal help</p></article><article class="product focus"><h2>Ambassador</h2><p>Purpose-driven outreach & organizing</p></article><article class="product"><h2>Clay</h2><p>Premium go-to-market workflows</p></article></div>
+<div class="charts">
+<div class="chart"><h2 class="chart-title">Cost + setup effort</h2>
+<svg viewBox="0 0 760 360" role="img" aria-label="Conceptual positioning by users: Clay occupies the top band and becomes stronger at the right. Ambassador fills the blue majority. Poke starts stronger at the bottom and tapers to nothing halfway across.">
+<path fill="#bfc3ca" d="M80 25H725V115C560 60 300 75 80 80Z"/>
+<path fill="#548bdd" d="M80 80C300 75 560 60 725 115V300H403C290 300 210 245 80 245Z"/>
+<path fill="#353940" d="M80 245C210 245 290 300 403 300H80Z"/>
+<path class="grid" d="M80 25V300H725"/>
+<path class="curve" stroke="#f3f3ef" d="M80 80C300 75 560 60 725 115"/>
+<path class="curve" stroke="#6d737d" d="M80 245C210 245 290 300 403 300"/>
+<text x="20" y="36">High</text><text x="24" y="300">Low</text>
+<text x="108" y="49" style="fill:#20242b;font-size:18px;font-weight:600">Clay</text>
+<text x="310" y="176" style="fill:#ffffff;font-size:32px;font-weight:600;letter-spacing:-1px">Ambassador</text>
+<text x="310" y="202" style="fill:#e6efff;font-size:14px">Built for community organizing</text>
+<text x="108" y="279" style="fill:#b2b6be;font-size:12px">Poke</text>
+<text x="403" y="335" text-anchor="middle" style="font-size:15px">Users</text>
+</svg></div>
+</div>
+<footer class="bottom"><span>Illustrative positioning only · Not measured pricing, effort, or performance</span><span>Ambassador / 03</span></footer>
+</section>
+<section id="slide-4" aria-labelledby="title-4">
+<header class="top"><span class="brand">Ambassador</span><span>The vision / 04</span></header>
+<div class="open-layout"><div class="intro"><p class="eyebrow">An open-source vision</p><h1 id="title-4">Built for organizers.<br><span>Shaped by them.</span></h1><p class="subtitle">A shared foundation for communities with different missions.</p><div class="principles"><article class="principle"><h2>Adapt it to your cause.</h2><p>Shape outreach around your community, your context, and your voice.</p></article><article class="principle"><h2>Build on each other's work.</h2><p>A vision for reusable workflows and community contributions.</p></article><article class="principle"><h2>Keep people in control.</h2><p>Review the exact email. Edit it. Approve before it sends.</p></article></div></div><div class="network" aria-label="A shared Ambassador foundation connects campaigns, contributors, fundraisers, and hackathons"><svg viewBox="0 0 400 400" aria-hidden="true"><path d="M200 70V330M70 200H330M105 105l190 190M295 105 105 295"/></svg><div class="core"><strong>✳</strong><small>ambassador</small></div><span class="node n1">Campaigns</span><span class="node n2">Contributors</span><span class="node n3">Fundraisers</span><span class="node n4">Hackathons</span></div></div>
+<footer class="bottom"><span>Open-source ambition · Repository license not yet present</span><span>Ambassador / 04</span></footer>
+</section>
+</main>
+<nav class="controls" aria-label="Presentation controls"><button id="prev" aria-label="Previous slide">←</button><button id="next" aria-label="Next slide">→</button><button id="fullscreen" aria-label="Toggle fullscreen">⛶</button></nav>
+<script>
+const slides=[...document.querySelectorAll('section')], deck=document.querySelector('main');
+function move(step){let current=slides.reduce((best,slide,i)=>Math.abs(slide.offsetTop-deck.scrollTop)<Math.abs(slides[best].offsetTop-deck.scrollTop)?i:best,0);slides[Math.max(0,Math.min(slides.length-1,current+step))].scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
+document.querySelector('#prev').onclick=()=>move(-1);document.querySelector('#next').onclick=()=>move(1);
+document.addEventListener('keydown',event=>{if(['ArrowRight','ArrowDown','PageDown',' '].includes(event.key)){event.preventDefault();move(1)}else if(['ArrowLeft','ArrowUp','PageUp'].includes(event.key)){event.preventDefault();move(-1)}});
+document.querySelector('#fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch{}};
+</script>
+</body>
+</html>
+
