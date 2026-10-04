@@ -3,15 +3,16 @@ import assert from 'node:assert/strict';
 import { neonConfig } from '@neondatabase/serverless';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { saveDocument } from '../lib/documents.mjs';
+import { storageConfig, storageBucket } from '../lib/files.mjs';
 import { database, contactImportQueries } from '../lib/db.mjs';
 
 test('Uploads require S3 and contact imports archive original bytes atomically',async t=>{
-  const keys=['DATABASE_URL','S3_ENDPOINT','S3_BUCKET','S3_REGION','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY'];
+  const keys=['DATABASE_URL','S3_ENDPOINT','S3_BUCKET','S3_REGION','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY','AWS_ENDPOINT_URL_S3','AWS_S3_BUCKET','AWS_REGION','AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY'];
   const previous=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
   const fetchFunction=neonConfig.fetchFunction;
   try {
     process.env.DATABASE_URL='postgresql://test:test@example.neon.tech/test';
-    for(const key of keys.filter(key=>key.startsWith('S3_')))delete process.env[key];
+    for(const key of keys.filter(key=>key!=='DATABASE_URL'))delete process.env[key];
     const send=mock.method(S3Client.prototype,'send',async()=>({}));
     const file=new File(['contact,email\nAlex,alex@example.com'],'contacts.csv');
     await t.test('Missing bucket settings never fall back to database bytes',async()=>{
@@ -59,4 +60,18 @@ test('Uploads require S3 and contact imports archive original bytes atomically',
     for(const key of keys){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}
     mock.restoreAll();
   }
+});
+
+test('Storage accepts Neon AWS environment variables and selects only an unambiguous bucket',async()=>{
+  const config=storageConfig({AWS_ENDPOINT_URL_S3:'https://storage.example',AWS_ACCESS_KEY_ID:'test-id',AWS_SECRET_ACCESS_KEY:'test-secret',AWS_REGION:'us-east-2'});
+  assert.equal(config.endpoint,'https://storage.example');assert.equal(config.region,'us-east-2');assert.equal(config.accessKeyId,'test-id');assert.equal(config.secretAccessKey,'test-secret');
+  assert.equal(storageConfig({...{AWS_ENDPOINT_URL_S3:'aws'},S3_ENDPOINT:'legacy'}).endpoint,'legacy');
+  const previous=[process.env.S3_BUCKET,process.env.AWS_S3_BUCKET];delete process.env.S3_BUCKET;delete process.env.AWS_S3_BUCKET;
+  try{
+    assert.equal(await storageBucket({send:async()=>({Buckets:[{Name:'context'}]})}),'context');
+    await assert.rejects(storageBucket({send:async()=>({Buckets:[]})}),/No bucket/);
+    await assert.rejects(storageBucket({send:async()=>({Buckets:[{Name:'one'},{Name:'two'}]})}),/Multiple buckets/);
+    await assert.rejects(storageBucket({send:async()=>{throw new Error('denied');}}),/AWS_S3_BUCKET/);
+    process.env.AWS_S3_BUCKET='selected';assert.equal(await storageBucket({send:()=>{throw new Error('Should not list');}}),'selected');
+  }finally{for(const [i,key] of ['S3_BUCKET','AWS_S3_BUCKET'].entries()){if(previous[i]===undefined)delete process.env[key];else process.env[key]=previous[i];}}
 });

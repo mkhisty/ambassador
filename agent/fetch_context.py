@@ -10,9 +10,9 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from diagnostics import verbose_log, fingerprint
 
 AGENT_DIR = Path(__file__).resolve().parent
-MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_CONTEXT_BYTES = 256 * 1024 * 1024
 
 
@@ -46,7 +46,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def read_api(opener, url, token, limit):
-    request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token})
+    request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token} if token else {})
     try:
         with opener.open(request, timeout=30) as response:
             body = response.read(limit + 1)
@@ -65,6 +65,26 @@ def read_api(opener, url, token, limit):
     return body
 
 
+def read_document(opener, url, token, limit, download_url=None):
+    if not download_url:
+        body = read_api(opener, url + '&download=link', token, max(limit, 16384))
+        try:
+            link = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            link = None
+        if isinstance(link, dict) and isinstance(link.get('downloadUrl'), str):
+            download_url = link['downloadUrl']
+        else:
+            if len(body) > limit:
+                raise RuntimeError('Context response exceeded its size limit.')
+            return body
+    parsed = urllib.parse.urlsplit(download_url)
+    if parsed.scheme != 'https' or not parsed.netloc or parsed.username or parsed.password:
+        raise ValueError('Website returned an invalid private download URL.')
+    # Never forward the agent bearer credential to object storage.
+    return read_api(opener, download_url, None, limit)
+
+
 def fetch_context(phone_number, *, context_root=None, opener=None):
     """Download all owned documents and publish the complete snapshot together.
 
@@ -72,6 +92,7 @@ def fetch_context(phone_number, *, context_root=None, opener=None):
     only after the complete new snapshot is published.
     """
     phone = normalize_phone(phone_number)
+    verbose_log('context.refresh_start', account=fingerprint(phone))
     base, token = context_settings()
     opener = opener or urllib.request.build_opener(NoRedirect())
     query = '?' + urllib.parse.urlencode({'phoneNumber': phone})
@@ -98,7 +119,7 @@ def fetch_context(phone_number, *, context_root=None, opener=None):
             if not isinstance(doc_id, str) or not re.fullmatch(r'[\w-]{1,100}', doc_id) or doc_id in ids:
                 raise ValueError('Website returned an invalid or duplicate document ID.')
             ids.add(doc_id)
-            if not isinstance(name, str) or not isinstance(size, int) or isinstance(size, bool) or not 0 < size <= MAX_FILE_BYTES:
+            if not isinstance(name, str) or not isinstance(size, int) or isinstance(size, bool) or size <= 0:
                 raise ValueError('Website returned invalid document metadata.')
             total += size
             if total > MAX_CONTEXT_BYTES:
@@ -106,11 +127,11 @@ def fetch_context(phone_number, *, context_root=None, opener=None):
             basename = re.sub(r'[^\w .()-]', '_', name.replace('\\', '/').split('/')[-1])[:160] or 'document'
             filename = hashlib.sha256(doc_id.encode()).hexdigest()[:16] + '-' + basename
             url = base + '/api/agent/context/documents/' + urllib.parse.quote(doc_id, safe='') + query
-            body = read_api(opener, url, token, MAX_FILE_BYTES)
+            body = read_document(opener, url, token, size, document.get('downloadUrl'))
             if len(body) != size:
                 raise ValueError('Context file size changed during refresh. Try again.')
             (snapshot / filename).write_bytes(body)
-            manifest.append({**document, 'localPath': filename, 'sha256': hashlib.sha256(body).hexdigest()})
+            manifest.append({**{k:v for k,v in document.items() if k != 'downloadUrl'}, 'localPath': filename, 'sha256': hashlib.sha256(body).hexdigest()})
         (snapshot / 'workspace.json').write_text(json.dumps({
             'phoneNumber': phone, 'user': payload.get('user'), 'campaign': payload.get('campaign'),
             'contacts': payload.get('contacts', []), 'activities': payload.get('activities', []),
@@ -122,6 +143,7 @@ def fetch_context(phone_number, *, context_root=None, opener=None):
         for old in user_dir.glob('snapshot-*'):
             if old != snapshot and old.is_dir() and not old.is_symlink():
                 shutil.rmtree(old)
+        verbose_log('context.refresh_done', account=fingerprint(phone), documents=len(manifest), downloaded_bytes=total)
         return snapshot
     finally:
         pointer.unlink(missing_ok=True)

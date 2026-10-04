@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
+    "db:migrate-email-recipients": "node --env-file-if-exists=.env.local scripts/migrate-email-recipients.mjs",
     "files:migrate": "node --env-file-if-exists=.env.local scripts/migrate-files.mjs",
     "db:check": "node --env-file-if-exists=.env.local scripts/check-neon.mjs",
     "db:check-google": "node --env-file-if-exists=.env.local scripts/check-google-storage.mjs",
@@ -15,13 +16,19 @@
     "db:setup-owner": "node --env-file-if-exists=.env.local scripts/setup-owner.mjs",
     "db:seed-demo": "node --env-file-if-exists=.env.local scripts/seed-demo.mjs",
     "demo:export": "node scripts/export-demo.mjs",
-    "test": "node --test --test-isolation=none test/*.test.mjs"
+    "test": "node --test --test-isolation=none test/*.test.mjs",
+    "db:migrate-document-size": "node --env-file-if-exists=.env.local scripts/migrate-document-size.mjs",
+    "files:cors": "node --env-file-if-exists=.env.local scripts/configure-file-cors.mjs",
+    "files:check": "node --env-file-if-exists=.env.local scripts/check-file-storage.mjs"
   },
   "overrides": {
-    "exceljs": { "uuid": "^11.1.1" }
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@neondatabase/serverless": "^1.2.0",
     "d3-sankey": "^0.12.3",
     "exceljs": "^4.4.0",

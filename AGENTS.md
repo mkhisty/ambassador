@@ -29,10 +29,54 @@ account; campaign and contact data currently form one shared workspace. New
 live uploads require private S3 storage; existing Postgres-backed documents
 remain readable.
 
-The agent receives direct iMessages, calls Hermes, and returns a “Review
-message” card. Its sheet supports Approve, Reject, and Edit → Approve; the
-original card can update to Approved or Rejected. Decisions currently print
-responses rather than execute outreach. Closing the sheet remains manual.
+The Photon sidecar acknowledges incoming messages with a thumbs-up tapback before
+queueing them for Hermes; reactions and read receipts are excluded. Failed tapbacks
+are logged without stopping message processing.
+
+The agent receives direct iMessages and sends Hermes's conversational replies
+as plain text without approval. The `send_email` tool dispatches a separate
+widget containing exact email fields; approving or editing and approving sends
+through the connected Gmail account, while rejection sends nothing. The actual
+outcome resumes Hermes's conversation and produces a plain-text follow-up.
+Calendar actions retain their dedicated approval card. Generic message-review
+scheduling is removed; existing generic cards cannot send through this listener.
+Reviews and pending email outcome notifications persist across restarts.
+Email recipients need not be saved or linked contacts. Hermes can use the user's
+provided recipient details and factual updates directly; contact association is
+optional bookkeeping, while attachment access remains owner-scoped.
+Conversation history is currently retained only in memory. Closing the sheet
+remains manual.
+
+Email proposals support a shared subject/body template and up to 20 recipients,
+each with parameter values. `[FIELD]` names are case-insensitive; missing values
+block the proposal. The widget highlights fields, displays the shared template
+and recipient values, and allows editing before approval. Approved batches send
+separate personalized emails through the existing website routes, with one
+persisted child review ID per recipient. Sending stops on failure and reports
+partial outcomes without automatic retry. `agent/email_templates.py` validates
+and expands templates; `agent/test_email_templates.py` covers batch approval,
+edits, escaping, failures, and restart protection. No database migration is needed.
+Email previews show the body once, first, with recipient values below it for
+batches. Successful sends use brief user-facing confirmations without provider
+terminology or routine delivery caveats; failures, partial sends, and uncertain
+outcomes still explain what needs attention.
+Email approval HTTP requests persist the reviewed decision and return 202 before
+provider sending. The widget immediately shows Approved/Done, and background
+workers send and notify Hermes afterward. Queued, unstarted sends resume on
+listener startup; interrupted in-flight sends remain uncertain and are not
+automatically retried. Native sheet dismissal remains manual.
+The email tool also accepts original context document paths, resolving them
+through the bound owner's `workspace.json` to stored document IDs. Previews show
+filenames with private review-scoped download links; emails include real MIME
+attachments. Outside paths, unlisted/generated files, and changed local copies
+are rejected. Both draft and send endpoints check attachment ownership and total
+size, with up to 20 documents, a 25,000,000-byte attachment cap, and a 35 MiB
+encoded MIME cap. Workspace uploads have no application per-file size cap and use private signed bucket transfers.
+
+For diagnostic logging, run `python3 listen.py --verbose` from `agent/` or set
+`AMBASSADOR_VERBOSE=1`. The worker logs redacted stages and requests sanitized
+Google/Gmail errors from authenticated website endpoints. Server-wide diagnostics
+use the same environment flag. Mode changes do not retry failed or uncertain sends.
 
 `agent/listen.py` handles communication and service lifecycle.
 `agent/get_response.py` holds agent logic and instructs Hermes to use a context
@@ -41,15 +85,18 @@ authenticated website API, plus profile/campaign/linked-contact context. Each
 normalized phone has its own hashed directory; complete snapshots publish
 atomically and replace only that user's previous files. Failed refreshes stop
 drafting and preserve the last complete snapshot. Hermes runs in the new
-snapshot directory. `agent/send_email.py` registers
-a Hermes tool that accepts email fields and attachment paths but returns
-`not_sent`; it does not fetch credentials, read attachments, or send email.
+snapshot directory. `agent/send_email.py` registers a tool accepting email
+fields and owned document IDs. It dispatches approval through a trusted Python
+callback and initially returns `awaiting_user_approval`. Google credentials,
+attachment checks, composition, and sending stay on the website. Tool-thread
+callbacks capture proposals independently of ContextVar mutations, which do not
+flow back to Hermes's parent thread. Outcome-only turns have no tools.
 
 The website-to-agent context path is connected. Hermes can check Google
 Calendar free/busy through the worker API and prepare an event proposal; the
 Photon review card creates an opaque primary-calendar event only after explicit
-approval. Gmail drafts remain website-only, and email is never sent
-automatically. Google OAuth and Neon token storage are in place; the developer
+approval. Both the website and agent can submit reviewed emails through Gmail;
+normal Hermes replies never authorize sending. Google OAuth and Neon token storage are in place; the developer
 has switched to an External testing audience and connected a test account.
 Existing connections must reconnect once to grant the added free/busy scope.
 Live Photon-to-Google end-to-end delivery still needs verification. Phone
@@ -155,17 +202,17 @@ Remaining work to make developer setup reliably clone-and-run:
   per context root; concurrent workers need locking before sharing a root.
 - [ ] **Document extraction:** Convert supported documents into readable
   context for Hermes while preserving originals for attachments.
-- [ ] **Structured email proposals:** Capture recipient, subject, body,
-  CC/BCC, and attachment references as a saved draft rather than relying on
-  Hermes's final text.
-- [ ] **Review and execution:** Display the exact email fields in the widget.
-  Edits create a new draft revision; approval authorizes that revision;
-  rejection blocks it.
-- [ ] **Email sending:** Implement `send_email()` to resolve the user's
-  connected account, refresh tokens, load authorized attachments, compose
-  the message, and call the email provider. The current tool is a stub;
-  replacing it with immediate sending during draft generation would bypass
-  the intended approval flow.
+- [x] **Structured email proposals:** The email tool captures exact fields and
+  owned attachment references, persists a draft, and dispatches its own widget.
+  Normal Hermes text is delivered directly and never treated as an email draft.
+- [ ] **Review and execution:** Exact email fields are reviewed and approved
+  edits are sent; rejection blocks sending. Immutable draft revision history and
+  stronger approval identity verification remain unfinished.
+- [x] **Email sending:** The website resolves connected Google credentials,
+  refreshes access, checks owned attachments, composes MIME, and submits Gmail
+  sends after widget approval. Hermes receives acceptance/rejection/failure or
+  uncertainty as a later conversation turn. Live end-to-end verification remains
+  required; model/tool generation itself never sends the email.
 - [x] **Agent Calendar actions:** Check free/busy without revealing event details;
   prepare an event proposal and create an opaque calendar hold only after the
   user approves it in the Photon review card. Reconnect Google for the added

@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { verboseLog, providerError, fingerprint, verboseEnabled } from './diagnostics.mjs';
 
 export const GOOGLE_SCOPES = [
   'openid',
@@ -39,15 +40,29 @@ export function decryptGoogleToken(row,key=tokenKey()) {
 
 export const hashOAuthState=state=>createHash('sha256').update(state).digest('hex');
 
-export async function googleAccessToken(sql,phone,requiredScope) {
+export async function googleAccessToken(sql,phone,requiredScope,{verbose=verboseEnabled(),reviewId=null}={}) {
+  const correlation={account:fingerprint(phone),review:fingerprint(reviewId)};
+  verboseLog('google.connection_lookup',correlation,verbose);
   const [connection]=await sql`SELECT google_email,scopes,refresh_token_ciphertext,refresh_token_iv,refresh_token_tag FROM ambassador_google_connections WHERE phone_number=${phone}`;
-  if (!connection) throw Object.assign(new Error('Connect a Google account first.'),{status:409});
+  if (!connection) {
+    verboseLog('google.connection_missing',correlation,verbose);
+    throw Object.assign(new Error('Connect a Google account first.'),{status:409});
+  }
   const requiredScopes=Array.isArray(requiredScope)?requiredScope:[requiredScope];
-  if (!requiredScopes.every(scope=>connection.scopes.includes(scope))) throw Object.assign(new Error('Reconnect Google and grant the requested permission.'),{status:403});
+  if (!requiredScopes.every(scope=>connection.scopes.includes(scope))) {
+    verboseLog('google.scope_missing',{...correlation,requiredScopes,grantedScopes:connection.scopes},verbose);
+    throw Object.assign(new Error('Reconnect Google and grant the requested permission.'),{status:403});
+  }
   const config=googleConfig(),key=tokenKey(),refreshToken=decryptGoogleToken(connection,key);
+  verboseLog('google.refresh_start',correlation,verbose);
   const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:config.clientId,client_secret:config.clientSecret,refresh_token:refreshToken,grant_type:'refresh_token'}),signal:AbortSignal.timeout(12000)});
   const result=await response.json();
-  if (!response.ok||!result.access_token) throw Object.assign(new Error('Google access expired. Reconnect the account and try again.'),{status:401});
+  if (!response.ok||!result.access_token) {
+    const diagnostics=providerError(result,response.status);
+    verboseLog('google.refresh_failed',{...correlation,provider:diagnostics},verbose);
+    throw Object.assign(new Error('Google access expired. Reconnect the account and try again.'),{status:401,diagnostics});
+  }
+  verboseLog('google.refresh_done',{...correlation,httpStatus:response.status,rotated:Boolean(result.refresh_token)},verbose);
   if (result.refresh_token) {
     const encrypted=encryptGoogleToken(result.refresh_token,key);
     await sql`UPDATE ambassador_google_connections SET refresh_token_ciphertext=${encrypted.refresh_token_ciphertext},refresh_token_iv=${encrypted.refresh_token_iv},refresh_token_tag=${encrypted.refresh_token_tag},updated_at=now() WHERE phone_number=${phone}`;

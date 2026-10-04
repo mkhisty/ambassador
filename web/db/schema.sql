@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS ambassador_documents (
   id text PRIMARY KEY,
   name text NOT NULL,
   mime text NOT NULL,
-  size integer NOT NULL CHECK (size BETWEEN 1 AND 2097152),
+  size bigint NOT NULL CHECK (size > 0),
   sponsor_id text REFERENCES ambassador_sponsors(id),
   object_key text,
   content bytea,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS ambassador_google_connections (
 CREATE TABLE IF NOT EXISTS ambassador_outreach_drafts (
   id text PRIMARY KEY,
   owner_phone_number text NOT NULL REFERENCES ambassador_users(phone_number) ON DELETE CASCADE,
-  sponsor_id text NOT NULL REFERENCES ambassador_sponsors(id) ON DELETE CASCADE,
+  sponsor_id text REFERENCES ambassador_sponsors(id) ON DELETE CASCADE,
   recipient text NOT NULL,
   subject text NOT NULL DEFAULT '',
   body text NOT NULL,
@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS ambassador_outreach_drafts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS review_id text;
+ALTER TABLE ambassador_outreach_drafts ALTER COLUMN sponsor_id DROP NOT NULL;
 ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS cc jsonb NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS bcc jsonb NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS attachment_refs jsonb NOT NULL DEFAULT '[]'::jsonb;
@@ -102,3 +103,7 @@ ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS approved_at time
 ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS sent_at timestamptz;
 DROP INDEX IF EXISTS ambassador_outreach_one_open_draft;
 CREATE UNIQUE INDEX ambassador_outreach_one_open_draft ON ambassador_outreach_drafts(owner_phone_number,sponsor_id) WHERE status='draft' AND review_id IS NULL;
+
+ALTER TABLE ambassador_documents DROP CONSTRAINT IF EXISTS ambassador_documents_size_check;
+ALTER TABLE ambassador_documents ALTER COLUMN size TYPE bigint;
+ALTER TABLE ambassador_documents ADD CONSTRAINT ambassador_documents_size_check CHECK (size > 0);

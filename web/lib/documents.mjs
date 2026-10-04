@@ -1,7 +1,7 @@
 import { database } from './db.mjs';
 import { normalizePhone } from './auth.mjs';
 import { randomUUID } from 'node:crypto';
-import { validateFile, requireObjectStorage, storeObject, removeObject } from './files.mjs';
+import { validateFile, requireObjectStorage, storeObject, removeObject, downloadUrl } from './files.mjs';
 
 // Contact imports include their record writes in the document's transaction.
 export async function saveDocument(file,phoneNumber,{sponsorId=null,queries=[]}={}) {
@@ -22,12 +22,12 @@ export async function saveDocument(file,phoneNumber,{sponsorId=null,queries=[]}=
 }
 
 export function documentMetadata(d) {
-  return {id:d.id,name:d.name,mime:d.mime,size:d.size,sponsorId:d.sponsor_id,ownerPhoneNumber:d.owner_phone_number,storage:d.object_key?'S3 bucket':'Neon Postgres',at:new Date(d.created_at).toISOString()};
+  return {id:d.id,name:d.name,mime:d.mime,size:Number(d.size),sponsorId:d.sponsor_id,ownerPhoneNumber:d.owner_phone_number,storage:d.object_key?'S3 bucket':'Neon Postgres',at:new Date(d.created_at).toISOString()};
 }
-export async function documentsForPhone(phoneNumber) {
+export async function documentsForPhone(phoneNumber,{downloadLinks=false}={}) {
   const phone=normalizePhone(phoneNumber),sql=database();
   const rows=await sql`SELECT id,name,mime,size,sponsor_id,owner_phone_number,object_key,created_at FROM ambassador_documents WHERE owner_phone_number=${phone} ORDER BY created_at DESC`;
-  return rows.map(documentMetadata);
+  return Promise.all(rows.map(async d=>({...documentMetadata(d),...(downloadLinks&&d.object_key?{downloadUrl:await downloadUrl(d.object_key,d.name)}:{})})));
 }
 export async function documentForOwner(id,phoneNumber) {
   const phone=normalizePhone(phoneNumber),sql=database();

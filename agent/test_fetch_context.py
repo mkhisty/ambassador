@@ -83,6 +83,19 @@ class ContextTests(unittest.TestCase):
         self.assertEqual((directory.parent / 'current').resolve(), directory)
         self.assertTrue(all(r.get_header('Authorization') == 'Bearer ' + 't' * 32 for r in self.web.calls))
 
+    def test_large_document_download_and_signed_url_omit_agent_credentials(self):
+        self.web.files = {'doc-large': ('large.pdf', b'x' * (3 * 1024 * 1024))}
+        directory = self.fetch()
+        manifest = json.loads((directory / 'workspace.json').read_text())
+        self.assertEqual((directory / manifest['documents'][0]['localPath']).stat().st_size, 3 * 1024 * 1024)
+        class Storage:
+            def open(inner, request, timeout):
+                self.assertIsNone(request.get_header('Authorization'))
+                return io.BytesIO(b'private attachment')
+        self.assertEqual(context.read_document(Storage(), 'https://website.example', 'private-token', 100, 'https://bucket.example/signed'), b'private attachment')
+        with self.assertRaises(ValueError):
+            context.read_document(Storage(), 'https://website.example', 'private-token', 100, 'http://unsafe.example/file')
+
     def test_refresh_removes_old_files_without_touching_other_users(self):
         old = self.fetch()
         other = self.fetch('+12025550101', FakeWebsite('+12025550101'))

@@ -101,3 +101,12 @@ test('Actual context SQL scopes profiles, linked contacts, activity, and documen
     else process.env.DATABASE_URL = previous;
   }
 });
+
+test('Owned storage downloads return short-lived links without proxying file bytes',async()=>{
+  const old=process.env.AGENT_API_TOKEN;process.env.AGENT_API_TOKEN='t'.repeat(32);
+  try{
+    const api=createContextHandlers({readDocument:async()=>({object_key:'private/key',name:'large.pdf'}),signDownload:async(key,name)=>{assert.equal(key,'private/key');assert.equal(name,'large.pdf');return 'https://storage.example/signed';},readStoredObject:()=>{throw new Error('Must not proxy');}});
+    const response=await api.document(new Request('https://app.example/api/agent/context/documents/doc-1?phoneNumber=%2B12025550100&download=link',{headers:{authorization:'Bearer '+process.env.AGENT_API_TOKEN}}),{params:Promise.resolve({id:'doc-1'})});
+    assert.equal(response.status,200);assert.deepEqual(await response.json(),{downloadUrl:'https://storage.example/signed'});
+  }finally{if(old===undefined)delete process.env.AGENT_API_TOKEN;else process.env.AGENT_API_TOKEN=old;}
+});

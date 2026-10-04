@@ -14,7 +14,6 @@ export async function GET(request) {
 export async function POST(request) {
   if(!authorized(request))return NextResponse.json({error:'Sign in to upload documents.'},{status:401});
   const owner=sessionPhone(request);if(!owner)return NextResponse.json({error:'Sign in again with your phone number.'},{status:401});
-  if(Number(request.headers.get('content-length'))>2200000)return NextResponse.json({error:'Maximum file size is 2 MB.'},{status:413});
   try {
     const form=await request.formData(),file=form.get('file'),sponsorId=form.get('sponsorId')||null;
     return NextResponse.json(await saveDocument(file,owner,{sponsorId}));
