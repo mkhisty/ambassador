@@ -1,8 +1,0 @@
-{
-  "name": "ambassador-imessage-echo",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "start": "node --env-file=../messaging-integration/.env echo.mjs"
-  }
-}
