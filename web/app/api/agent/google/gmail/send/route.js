@@ -50,7 +50,7 @@ async function rawMessage(sql,phone,proposal,replyHeaders=[]) {
 
 export async function POST(request) {
   if(!agentAuthorized(request))return Response.json({error:'Agent authentication required.'},{status:401,headers:privateHeaders});
-  if(!configured())return Response.json({error:'Neon is not connected.'},{status:503,headers:privateHeaders});
+  if(!configured())return Response.json({error:'Email sending is temporarily unavailable.'},{status:503,headers:privateHeaders});
   const verbose=verboseEnabled(request);
   let claimed=null,sql,phone,reviewId,stage='validation';
   try {

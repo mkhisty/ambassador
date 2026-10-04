@@ -8,13 +8,13 @@ export async function GET(request) {
   return NextResponse.json({mode:configured()?'neon':'demo',authenticated:Boolean(phoneNumber),phoneNumber,ready:authReady()},{headers:{'Cache-Control':'no-store'}});
 }
 export async function POST(request) {
-  if(!configured()||!authReady())return NextResponse.json({error:'Configure database, invitation password, and session secret.'},{status:503});
+  if(!configured()||!authReady())return NextResponse.json({error:'Account services are temporarily unavailable.'},{status:503});
   if(!sameOrigin(request))return NextResponse.json({error:'Invalid request origin.'},{status:403});
   try {
     const text=await request.text();if(Buffer.byteLength(text)>4096)return NextResponse.json({error:'Request too large.'},{status:413});
     const body=JSON.parse(text),phone=normalizePhone(body.phoneNumber),sql=database();
     if(body.action==='signup'){
-      if((process.env.WORKSPACE_INVITE_PASSWORD?.length||0)<12)return NextResponse.json({error:'Account registration is not configured.'},{status:503});
+      if((process.env.WORKSPACE_INVITE_PASSWORD?.length||0)<12)return NextResponse.json({error:'Account registration is temporarily unavailable.'},{status:503});
       if(!safeEqual(body.invitePassword,process.env.WORKSPACE_INVITE_PASSWORD))return NextResponse.json({error:'Incorrect workspace invitation password.'},{status:401});
       const passwordHash=await hashPassword(body.password);
       await sql.transaction([

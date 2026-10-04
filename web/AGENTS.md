@@ -38,7 +38,7 @@ The website handles campaign overview, contact management, bulk imports, relatio
 ## Implemented interface
 
 - Sign-in and sidebar branding use `assets/logo.png` through a static Next.js image import; the same asset supplies browser and Apple touch icons.
-- Navigation: Overview, Knowledge graph, Contacts, Documents, Imports, Campaign settings, Connected apps.
+- Navigation: Overview, Knowledge graph, Contacts, Documents, Campaign settings, Connected apps. Contact spreadsheet imports start in Documents; import requirements and the sample template live there too.
 - Knowledge graph links shared relationship nodes using explicit stored fields. Product owners anchor the default view. Click text labels to slide between product owners, contact methods, or stages; only one grouping is active. Organizations are excluded from the graph. Industries, lead types, campaign nodes, next actions, documents, and history are excluded. Relationship notes live in the inspector; original records remain available in their respective sections.
 - Overview counts contacts, responses, completed outcomes, and overdue follow-ups. Optional targets count outcomes, not dollars.
 - Overview shows a daily summary of recorded contact activity with a direct link to the Sankey pipeline.
@@ -46,7 +46,7 @@ The website handles campaign overview, contact management, bulk imports, relatio
 - Contact editor supports a name or organization, address, phone, channel, lead type, category, owner, notes, reason for outreach, next action/date, and activity history. Organization is optional.
 - Visible stages: Identified, Ready, Contacted, Replied, Follow-up, Completed, Declined.
 - Campaign settings include name, deadline, optional context/location, audience description, objective, outreach guidelines, and optional outcome target.
-- CSV/XLSX import supports column mapping, validation preview, duplicate skipping, and at most 500 contacts per file. XLSX uses the first sheet and cached formula results. Contact exports omit financial fields.
+- CSV/XLSX import starts from Documents, where contact spreadsheets are reviewed through column mapping, validation preview, duplicate skipping, and a limit of 500 contacts per file; their original files are saved with campaign documents. Imports retains the unchanged import requirements and sample template. XLSX uses the first sheet and cached formula results. Contact exports omit financial fields.
 - The live workspace refreshes every 30 seconds when visible and not editing a contact/import dialog.
 
 ## Database and compatibility

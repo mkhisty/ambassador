@@ -16,7 +16,7 @@ function rawMessage({recipient,subject,body}) {
 }
 
 export async function POST(request) {
-  if (!configured()) return NextResponse.json({error:'Neon is not connected.'},{status:503});
+  if (!configured()) return NextResponse.json({error:'Email sending is temporarily unavailable.'},{status:503});
   if (!authorized(request)) return NextResponse.json({error:'Sign in before approving and sending email.'},{status:401});
   let claimed=null,sql,phone;
   try {

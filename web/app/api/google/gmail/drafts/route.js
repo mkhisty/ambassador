@@ -15,7 +15,7 @@ function rawMessage({to,subject,body}) {
 }
 
 export async function POST(request) {
-  if (!configured()) return NextResponse.json({error:'Neon is not connected.'},{status:503});
+  if (!configured()) return NextResponse.json({error:'Email drafts are temporarily unavailable.'},{status:503});
   if (!authorized(request)) return NextResponse.json({error:'Sign in before creating a Gmail draft.'},{status:401});
   try {
     const text=await request.text();if(Buffer.byteLength(text)>25000)return NextResponse.json({error:'Draft is too large.'},{status:413});
