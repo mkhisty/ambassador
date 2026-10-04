@@ -1,6 +1,6 @@
 # Ambassador: hackathon sponsorship coordinator
 
-Ambassador helps hackathon organizers manage sponsor leads, outreach, and contract status. Organizers interact with the agent through iMessage using Photon Spectrum.
+Ambassador coordinates people, events, and relationship-driven outreach through iMessage using Photon Spectrum. Party attendance, weddings, recruiter outreach, startup go-to-market work, and political campaigns are broader product use cases. This implemented demo focuses on hackathon sponsor leads, outreach, and contract status.
 
 
 ## Demo flow
@@ -29,6 +29,6 @@ The intended outreach channels are email, iMessage, and LinkedIn. Each needs a v
 
 ## Current state
 
-An offline mock demo is available in `demo/`. Run `python demo/run_demo.py` to generate importable lead data, drafts, a simulated iMessage approval conversation, and a local `.eml` outbox. Run `python demo/test_demo.py` to check approval and duplicate handling. All identities and approvals are fictional. No outreach has been delivered.
+An offline mock demo is available in `demo/` with 26 fictional sponsor accounts across all seven stages. From `messaging-integration`, run `python demo/run_demo.py` to generate importable lead data, five qualified-account drafts, a simulated iMessage approval conversation, and a local `.eml` outbox. Run `python demo/test_demo.py` to check approval and duplicate handling. `web/lib/demo.mjs` is the shared source; run `npm run demo:export` in `web` after changing it. All identities and approvals are fictional. No outreach has been delivered.
 
 The Node service described in `README.md` now implements Notion/Sheets reads, AI drafting when configured, Spectrum iMessage approvals, SMTP email sending, and persistent state. Local preview tests pass; live provider verification requires account credentials. LinkedIn remains a manual draft handoff.

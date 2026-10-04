@@ -1,6 +1,6 @@
 # Ambassador
 
-Hackathon sponsorship outreach, reviewed by an organizer in iMessage through Photon Spectrum.
+Events and relationship-driven outreach, coordinated in iMessage through Photon Spectrum. The current demo highlights hackathon sponsorship; the broader product can apply to party attendance, weddings, recruiter outreach, startup go-to-market work, and political campaigns.
 
 The working service reads sponsor leads, drafts messages, saves them in SQLite, and sends only after an authorized organizer approves the exact draft ID. Email uses SMTP; iMessage uses Spectrum. LinkedIn currently provides a draft for manual handoff. A local terminal uses the same workflow for preview testing.
 
@@ -16,16 +16,16 @@ npm run doctor
 npm run chat
 ```
 
-Start with `leads`, then `draft lead-001`. Review the recipient and message, then type the displayed `approve d-...` command. In the default `SEND_MODE=preview`, an email is written to `data/outbox/` and nobody is contacted. `status` shows the saved result. `exit` stops terminal mode.
+Start with `leads`, then `draft lead-012`. Review the recipient and message, then type the displayed `approve d-...` command. In the default `SEND_MODE=preview`, an email is written to `data/outbox/` and nobody is contacted. `status` shows the saved result. `exit` stops terminal mode.
 
-`npm test` runs offline approval, persistence, provider-failure, replay, and adapter tests. The Python files in `demo/` remain the original fixture generator; use the Node service for the actual agent.
+`npm test` runs offline approval, persistence, provider-failure, replay, and adapter tests. The Python files in `demo/` use the shared 26-account fictional sponsorship scenario; use the Node service for the actual agent.
 
 ## Connect Spectrum and your organizer
 
 1. Create a project at [Photon](https://app.photon.codes) and enable its iMessage connection. Register the organizer as a project user if using a shared line, then use the assigned number shown in the dashboard.
 2. In `.env`, set `PROJECT_ID`, `PROJECT_SECRET`, and `ORGANIZER_IDS` to the organizer's exact E.164 sender number (for example `+12025550100`). For an Apple ID sender, use the exact email identity instead. Comma-separated organizers are supported.
 3. Keep `SEND_MODE=preview` initially. Run `npm start`, then text `help` to the Photon number from the configured organizer account.
-4. Text `draft lead-001`. Review the returned draft and approve its ID to produce an offline email preview. This verifies the real Spectrum -> agent -> iMessage approval path while outreach remains in preview mode.
+4. Text `draft lead-012`. Review the returned draft and approve its ID to produce an offline email preview. This verifies the real Spectrum -> agent -> iMessage approval path while outreach remains in preview mode.
 
 Only inbound, direct organizer messages control the agent. Group messages, self-echoes, edits, and reactions cannot approve a send. An approval belongs to the organizer and conversation that created the draft. The terminal cannot authorize live sends. All configured organizers can inspect overall outreach status.
 
@@ -35,7 +35,7 @@ For iMessage outreach, shared-line recipients must also be registered as project
 
 Set `OPENAI_API_KEY`; `OPENAI_MODEL` defaults to `gpt-4.1-mini`. Requests include event details, the selected lead and its notes, and recent organizer context for intent classification. Without a key the agent clearly labels template drafts and supports explicit commands.
 
-With a key, try “Prepare outreach to Northstar” and then “Make that shorter.” Revisions generate a new draft ID; old IDs cannot be approved. The model cannot send or approve messages. [OpenAI Chat Completions reference](https://developers.openai.com/api/reference/resources/chat).
+With a key, try “Prepare outreach to Fieldwork” and then “Make that shorter.” Revisions generate a new draft ID; old IDs cannot be approved. The model cannot send or approve messages. [OpenAI Chat Completions reference](https://developers.openai.com/api/reference/resources/chat).
 
 ## Connect email and send to your own test inbox
 

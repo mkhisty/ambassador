@@ -33,14 +33,14 @@ const draftId = text => text.match(/d-[a-f0-9]{12}/)?.[0];
 
 test('real preview email requires exact approval, survives restart, and cannot resend', async t => {
   const s = setup(t);
-  const id = draftId(await s.ask('draft lead-001'));
+  const id = draftId(await s.ask('draft lead-012'));
   assert.ok(id);
   assert.match(await s.ask('approve'), /exactly approve/);
   assert.match(await s.ask(`approve ${id}`, { conversation: 'another-chat' }), /not found/);
   assert.equal(await s.ask(`approve ${id}`, { actor: 'attacker' }), null);
   assert.match(await s.ask(`approve ${id}`), /No message delivered/);
   const outbox = join(s.directory, 'outbox');
-  assert.match(readFileSync(join(outbox, `${id}.eml`), 'utf8'), /To: jamie@example.com/);
+  assert.match(readFileSync(join(outbox, `${id}.eml`), 'utf8'), /To: partner12@example.com/);
   assert.match(await s.ask(`approve ${id}`), /cannot be sent again/);
   const db2 = openStore(s.directory);
   try {
@@ -52,18 +52,18 @@ test('real preview email requires exact approval, survives restart, and cannot r
 
 test('edit invalidates old approval and creates a newly reviewable draft', async t => {
   const s = setup(t);
-  const old = draftId(await s.ask('draft lead-001'));
-  const id = draftId(await s.ask(`edit ${old} Hi Jamie, would you like to discuss sponsorship?`));
+  const old = draftId(await s.ask('draft lead-012'));
+  const id = draftId(await s.ask(`edit ${old} Hi Robin, would you like to discuss sponsorship?`));
   assert.notEqual(old, id);
   assert.match(await s.ask(`approve ${old}`), /superseded/);
-  assert.match(await s.ask(`show ${id}`), /Hi Jamie/);
+  assert.match(await s.ask(`show ${id}`), /Hi Robin/);
   assert.match(await s.ask(`approve ${id}`), /preview saved/);
 });
 
 test('source changes and expiration block sending', async t => {
   const s = setup(t);
-  const id = draftId(await s.ask('draft lead-001'));
-  s.c.fixture.leads[0].address = 'changed@example.com';
+  const id = draftId(await s.ask('draft lead-012'));
+  s.c.fixture.leads.find(l => l.id === 'lead-012').address = 'changed@example.com';
   assert.match(await s.ask(`approve ${id}`), /details changed/);
   s.db.prepare('UPDATE drafts SET created=0 WHERE id=?').run(id);
   assert.match(await s.ask(`approve ${id}`), /expired/);
@@ -72,10 +72,10 @@ test('source changes and expiration block sending', async t => {
 test('provider failure becomes uncertain and blocks a second attempt', async t => {
   let attempts = 0;
   const s = setup(t, { channels: { check() {}, async send() { attempts++; throw new Error('Network timeout'); } } });
-  const id = draftId(await s.ask('draft lead-001'));
+  const id = draftId(await s.ask('draft lead-012'));
   assert.match(await s.ask(`approve ${id}`), /uncertain/);
   assert.match(await s.ask(`approve ${id}`), /cannot be sent again/);
-  assert.match(await s.ask('draft lead-001'), /active draft/);
+  assert.match(await s.ask('draft lead-012'), /active draft/);
   assert.equal(attempts, 1);
 });
 
@@ -84,7 +84,7 @@ test('source write-back retry never repeats a successful provider send', async t
   const fixture = JSON.parse(readFileSync('demo/fixtures.json', 'utf8'));
   const s = setup(t, { source: { async read() { return fixture.leads; }, async markContacted() { if (++updates === 1) throw new Error('Unavailable'); } },
     channels: { check() {}, async send() { attempts++; return { status: 'accepted', providerId: 'smtp-123' }; } } });
-  const id = draftId(await s.ask('draft lead-001'));
+  const id = draftId(await s.ask('draft lead-012'));
   assert.match(await s.ask(`approve ${id}`), /status update failed/);
   assert.match(await s.ask('sync-status'), /Updated 1/);
   assert.match(await s.ask(`approve ${id}`), /cannot be sent again/);
@@ -95,7 +95,7 @@ test('source write-back retry never repeats a successful provider send', async t
 test('replayed and concurrent approval events produce only one provider attempt', async t => {
   let attempts = 0;
   const s = setup(t, { channels: { check() {}, async send() { attempts++; return { status: 'preview', file: 'test.eml' }; } } });
-  const id = draftId(await s.ask('draft lead-001'));
+  const id = draftId(await s.ask('draft lead-012'));
   const responses = await Promise.all([s.ask(`approve ${id}`, { messageId: 'same' }), s.ask(`approve ${id}`, { messageId: 'same' }), s.ask(`approve ${id}`)]);
   assert.equal(attempts, 1);
   assert.ok(responses.some(r => r.includes('preview saved')));
@@ -111,14 +111,14 @@ test('live mode refuses terminal approval and reserved mock recipients', async t
   const s = setup(t, { env: { SEND_MODE: 'live' } });
   const draft = { mode: 'live', from: s.c.from, channel: 'imessage', to: '+12025550143' };
   assert.throws(() => s.channels.check(draft), /fictional leads/);
-  const response = await s.ask('draft lead-001', { terminal: true, actor: 'local-organizer' });
+  const response = await s.ask('draft lead-012', { terminal: true, actor: 'local-organizer' });
   assert.match(await s.ask(`approve ${draftId(response)}`, { terminal: true, actor: 'local-organizer' }), /require approval.*Spectrum/);
 });
 
 test('LinkedIn remains unsent and contract-review leads are not pitched again', async t => {
   const s = setup(t);
   assert.match(await s.ask('draft lead-004'), /not appropriate/);
-  const id = draftId(await s.ask('draft lead-002'));
+  const id = draftId(await s.ask('draft lead-014'));
   assert.match(await s.ask(`approve ${id}`), /manual handoff/);
   assert.equal(s.db.prepare('SELECT status FROM drafts WHERE id=?').get(id).status, 'pending');
 });
@@ -146,7 +146,7 @@ test('Spectrum adapter accepts only inbound organizer DMs, including threaded re
 
 test('Notion reads every page and writes only the contacted status after checking identity', async () => {
   const c = config({ LEAD_SOURCE: 'notion', NOTION_TOKEN: 'test-token', NOTION_DATA_SOURCE_ID: 'source-id' });
-  const leads = c.fixture.leads.slice(0, 2);
+  const leads = c.fixture.leads.filter(l => l.status === 'ready').slice(0, 2);
   const page = (lead, id) => ({ id, properties: Object.fromEntries(Object.entries(lead).map(([key, value]) => [key,
     { type: 'rich_text', rich_text: [{ plain_text: value }] }])) });
   const pages = leads.map((l, i) => page(l, `page-${i}`));
