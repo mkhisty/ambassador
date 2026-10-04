@@ -1,12 +1,20 @@
 import unittest
 import json
+import contextvars
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import get_response
+import calendar_tools
+from send_email import handle_send_email
 
 
 class ResponseTests(unittest.TestCase):
+    def setUp(self):
+        get_response.CONVERSATIONS.clear()
+        calendar_tools.calendar_proposal.set(None)
+
     def test_fetches_phone_context_before_generating_response(self):
         calls = []
         directory = '/tmp/phone-context'
@@ -45,6 +53,9 @@ class ResponseTests(unittest.TestCase):
         self.assertIn(json.dumps(str(Path('/tmp/user-context').resolve())), instructions)
         self.assertIn('Inspect relevant files', instructions)
         self.assertIn('missing or empty', instructions)
+        self.assertIn('contact list is context, not an allowlist', instructions)
+        self.assertIn('factual updates supplied by', instructions)
+        self.assertIn('Never invent a contact_id', instructions)
 
     def test_failure_and_empty_response_close_agent(self):
         for result in ({'failed': True, 'error': 'Provider failed'}, {'final_response': '  '}):
@@ -63,6 +74,53 @@ class ResponseTests(unittest.TestCase):
             with self.assertRaises(ConnectionError):
                 get_response.generate_response('Hello', '/tmp/user-context')
         agent.close.assert_called_once()
+
+    def test_same_phone_retains_conversation_but_other_users_do_not(self):
+        agent = Mock()
+        history = [{'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Hi'}]
+        agent.run_conversation.return_value = {'final_response': 'Hi', 'messages': history}
+        with patch.object(get_response, 'load_hermes', return_value=self.runtime(agent)):
+            get_response.generate_response('Hello', '/tmp/context', phone_number='+12025550100')
+            get_response.generate_response('Continue', '/tmp/context', phone_number='+12025550100')
+            self.assertEqual(agent.run_conversation.call_args.kwargs['conversation_history'], history)
+            get_response.generate_response('Hello', '/tmp/context', phone_number='+12025550101')
+            self.assertNotIn('conversation_history', agent.run_conversation.call_args.kwargs)
+
+    def test_email_outcome_resumes_conversation_without_action_tools(self):
+        agent = Mock()
+        agent.run_conversation.return_value = {'final_response': 'Understood, nothing was sent.'}
+        runtime = self.runtime(agent)
+        history = [{'role': 'user', 'content': 'Email Jamie'}]
+        get_response.CONVERSATIONS['+12025550100'] = history
+        event = {'sender': {'id': '+12025550100'}, 'requestText': 'Email Jamie'}
+        outcome = {'status': 'rejected', 'proposal': {'recipient': 'jamie@example.com'}}
+        with patch.object(get_response, 'fetch_context', return_value='/tmp/context'), \
+                patch.object(get_response, 'load_hermes', return_value=runtime):
+            self.assertEqual(get_response.handle_email_outcome(event, outcome), 'Understood, nothing was sent.')
+        call = agent.run_conversation.call_args.kwargs
+        self.assertEqual(json.loads(call['user_message'])['outcome'], outcome)
+        self.assertEqual(call['conversation_history'], history)
+        self.assertEqual(runtime[0].call_args.kwargs['enabled_toolsets'], [])
+
+    def test_calendar_worker_proposal_is_captured_and_second_action_is_blocked(self):
+        agent = Mock()
+        def conversation(**kwargs):
+            args = {'summary': 'Call', 'start': '2026-10-04T14:30:00-04:00',
+                    'end': '2026-10-04T15:00:00-04:00', 'time_zone': 'America/New_York'}
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                calendar = pool.submit(contextvars.copy_context().run, calendar_tools.propose_calendar_event, args).result()
+                email = pool.submit(contextvars.copy_context().run, handle_send_email,
+                                    {'to': 'jamie@example.com', 'subject': 'Hello', 'text': 'Email'}).result()
+            self.assertEqual(json.loads(calendar)['status'], 'awaiting_user_approval')
+            self.assertIn('error', email)
+            return {'final_response': 'Please review the calendar event.'}
+        agent.run_conversation.side_effect = conversation
+        with patch.object(get_response, 'load_hermes', return_value=self.runtime(agent)):
+            reply, email = get_response.generate_response('Schedule a call', '/tmp/context',
+                phone_number='+12025550100', return_proposal=True)
+        self.assertIsNone(email)
+        self.assertEqual(calendar_tools.calendar_proposal.get()['summary'], 'Call')
+        self.assertIsNone(calendar_tools.calendar_review.get())
 
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@ from fetch_context import context_settings, normalize_phone
 
 calendar_owner = ContextVar('calendar_owner', default=None)
 calendar_proposal = ContextVar('calendar_proposal', default=None)
+calendar_review = ContextVar('calendar_review', default=None)
 
 CHECK_CALENDAR_SCHEMA = {
     'name': 'check_calendar_availability',
@@ -119,10 +120,17 @@ def propose_calendar_event(args, **kwargs):
         return json.dumps({'error': str(error)})
     if calendar_proposal.get() is not None:
         return json.dumps({'error': 'Only one event can be proposed per iMessage request. Send a new request for another event.'})
-    calendar_proposal.set({
+    proposal = {
         'summary': args['summary'].strip(), 'start': args['start'], 'end': args['end'],
         'timeZone': args['time_zone'], 'description': args.get('description', ''), 'location': args.get('location', ''),
-    })
+    }
+    dispatch = calendar_review.get()
+    if dispatch:
+        try:
+            dispatch(proposal)
+        except ValueError as error:
+            return json.dumps({'error': str(error)})
+    calendar_proposal.set(proposal)
     return json.dumps({'status': 'awaiting_user_approval', 'message': 'No event created yet. The user must tap Add to Calendar on the review card.'})
 
 

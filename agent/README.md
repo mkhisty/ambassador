@@ -1,17 +1,31 @@
 # Ambassador response widget
 
-`listen.py` receives a direct Photon iMessage, calls `get_response.py`,
-and sends its response as a Spectrum mini-app card. Message cards support
-**Approve**, **Reject**, and **Edit → Approve**; message decisions are still
-logged only and never send outreach. Calendar proposals use a dedicated review
-card with **Add to Calendar** and **Reject**. Close the sheet to return to the
-conversation; automatic native sheet dismissal is not implemented because no
-supported Spectrum web bridge for dismissal was verified.
+`listen.py` receives a direct Photon iMessage and sends Hermes's natural reply
+straight back as plain text. Ordinary replies never create an approval widget.
+Incoming messages get a 👍 tapback immediately, including while Hermes is busy
+with an earlier message. This acknowledgement does not send an extra text.
+Reactions and read receipts are excluded to prevent reaction loops. If Photon
+cannot add the tapback, the error is logged and message processing continues.
+The `send_email` tool sends a separate Spectrum card containing the actual email
+recipient, subject, body, CC/BCC, and attachment references. **Approve & Send**
+or **Edit & Send** submits the reviewed fields through Gmail; **Reject** sends
+nothing. The resulting acceptance, rejection, failure, or uncertainty is passed
+back to Hermes, which replies naturally in the same owner's conversation.
 
-`get_response.py` holds the main agent logic: Hermes configuration and runtime
-loading, response generation through `get_response(text, phone_number)`, and logging review
-decisions through `handle_decision(response)`. `listen.py` handles only messaging,
-widget callbacks, and communication service startup/shutdown.
+Calendar proposals retain their dedicated **Add to Calendar** / **Reject** card.
+Automatic generic iMessage follow-up review scheduling is removed. Previously
+saved generic message cards are not recovered, and their approvals cannot send
+outreach through the current listener. Close the sheet manually to return to the
+conversation; no supported Spectrum dismissal bridge was verified.
+
+`get_response.py` holds Hermes configuration, response generation, per-phone
+conversation history, and email outcome handling. Tool callbacks capture action
+proposals even when Hermes runs tools on worker threads. `listen.py` handles
+messaging, widget callbacks, outcome delivery, and communication service lifecycle.
+Conversation history is retained in memory until restart. Persisted email reviews
+retain the original request and proposal so pending outcomes can still be reported
+after restart. Hermes outcome turns have no tools, preventing another email or
+action from being triggered by an approval notification.
 
 For each incoming message, `get_response` passes the sender's phone number to
 `fetch_context.fetch_context(phone_number)`. It authenticates to the website,
@@ -29,13 +43,81 @@ its working directory and instructs it to inspect relevant files before preparin
 the response for review. Original documents are preserved; automatic extraction
 into plain text is not implemented. Context is ignored by Git.
 
-`send_email.py` registers a Hermes tool named `send_email`. Hermes supplies
-`to`, `subject`, `text`, and optional `attachment_paths`, `cc`, `bcc`, and
-`reply_to`. It currently returns `status: not_sent` and the proposed email;
-it does not read attachments, fetch credentials, or send anything. The sender's
-phone number is bound by Python request context, not selected by the model.
-The future database credential lookup and email composition/sending belong in
-the `send_email()` function. Live sending and approval wiring are not implemented.
+`send_email.py` registers `send_email`, accepting `to`, `subject`, `text`, and
+optional `attachment_refs`, `cc`, `bcc`, `reply_to`, and `contact_id`.
+It also accepts `attachment_paths` for original context documents listed in
+`workspace.json`; paths may be relative to the bound context directory or absolute
+inside it. The tool resolves them to owned stored document IDs. It refuses paths
+outside that directory, unlisted files, another user's documents, and changed
+local copies. Generated files must be uploaded to the workspace before attaching.
+
+For a personalized batch, omit `to` and pass `recipients` (1–20 entries), a shared
+`subject`, and `text` template. Each entry contains `email` and `parameters`:
+
+```json
+{
+  "subject": "Hello [NAME]",
+  "text": "Hi [Name], would [COMPANY] like to join us?",
+  "recipients": [
+    {"email": "jamie@example.com", "parameters": {"NAME": "Jamie", "COMPANY": "Example"}},
+    {"email": "alex@example.com", "parameters": {"NAME": "Alex", "COMPANY": "Another company"}}
+  ]
+}
+```
+
+The review shows the email text once, first, highlights `[FIELD]` placeholders in
+purple, and lists each recipient's values below the template. Edit can change the template, addresses, and
+parameters; recipient count and attachment references stay fixed. Field names
+are case-insensitive identifiers such as `NAME` or `FIRST_NAME`; every field must
+have a value for every recipient. Templates for one recipient use the same shape.
+Approval sends a separate personalized email per recipient. Shared CC/BCC,
+reply-to, and attachments apply to each email. Each child draft has its own
+persisted review ID; sending stops at the first failure and reports per-recipient
+acceptance/failure/uncertainty and remaining unsent recipients. Batches are not
+automatically retried, including after restart.
+
+Successful sends produce brief natural replies such as “Sent.” or “Sent to all
+20 recipients.” Provider acknowledgment details and routine delivery caveats stay
+out of replies. Explicit failures, partial sends, and uncertain outcomes still
+explain the problem and any action needed.
+
+Approval saves the reviewed fields and immediately returns an acknowledgment.
+The widget shows **Approved** and **Done**, so the user can close the sheet while
+email sending continues in the background. The original card updates to Approved
+and Hermes reports the actual send outcome later. A queued send that has not
+started resumes after listener restart; an interrupted in-flight send remains
+uncertain and is never automatically retried. Sheet dismissal is still manual.
+
+Any valid email address supplied by the user is allowed, including new recipients
+who are not saved or linked contacts. Hermes also uses the user's supplied details
+and factual updates directly. Omit `contact_id` when there is no matching saved
+contact. The contact list supplies context rather than restricting recipients.
+
+Attachment references sent to the website are owned document IDs. The review
+displays filenames and private download links beside the email text. Downloads
+use the review's expiring bearer link and the backend's owner checks; credentials
+and S3 URLs are never exposed. Recipients receive the file bytes as ordinary email
+attachments, including for every personalized email in a batch.
+
+Up to 20 documents can be selected, subject to a 25,000,000-byte combined limit
+and Gmail's 35 MiB encoded MIME limit. The website rechecks ownership, metadata,
+and actual byte sizes before sending via Gmail's MIME media-upload endpoint.
+Workspace uploads use direct bucket transfers without the previous 2 MiB limit. See
+[Gmail attachment limits](https://support.google.com/mail/answer/6584) and the
+[Gmail API discovery metadata](https://gmail.googleapis.com/$discovery/rest?version=v1).
+
+The trusted callback saves
+the proposal through `/api/agent/google/gmail/drafts` and sends its review widget
+while the tool runs. The initial tool result is `awaiting_user_approval`; a later
+conversation turn supplies the user's decision and provider outcome. One action
+proposal is allowed per incoming message.
+
+Only approval calls `/api/agent/google/gmail/send`. The website resolves the
+owner's connected Google credentials, checks attachment ownership, composes the
+email, and submits it to Gmail. The worker never receives Google credentials.
+Provider acceptance is not proof of delivery. Unknown sends are not automatically
+retried. Reviews and pending outcome notifications are persisted in
+`agent/data/reviews.json`; queued feedback resumes after restart.
 
 ## Google Calendar through Photon
 
@@ -94,8 +176,8 @@ In another terminal, use the HTTPS forwarding URL ngrok displays:
 WIDGET_PUBLIC_URL=https://YOUR-HOST.ngrok-free.app python3 listen.py
 ```
 
-Text the Photon number, then tap the returned card to open the review widget
-in Spectrum's sheet view. Inline live rendering is disabled so the response
+Text the Photon number to receive a normal reply. Ask Hermes to send an email,
+then tap its separate approval card to open the review widget in Spectrum's sheet view. Inline live rendering is disabled so the response
 has more room. Recipients without the Spectrum extension get a URL fallback.
 
 Example terminal output after editing and approving:
@@ -107,16 +189,42 @@ Widget response: {"action": "edit_approve", "text": "My edited response", "origi
 The widget binds to `127.0.0.1:8792`; `WIDGET_BIND` and `WIDGET_PORT` can override
 these. Keep the sidecar on loopback. Review links contain secret bearer tokens:
 anyone with a link can submit that demo response. Tokens expire after 24 hours,
-and restarting the listener invalidates all links. Each review accepts one
-submission. Editing is local until **Approve edited response** is pressed.
+and persisted reviews survive listener restarts. Each review accepts one
+submission. Email edits are local until **Edit & Send** is pressed.
+
+## Verbose logging
+
+From `agent/`, start the listener with:
+
+```sh
+python3 listen.py --verbose
+```
+
+Alternatively, set `AMBASSADOR_VERBOSE=1` in `agent/.env.local` or in the process
+environment. Detailed logs go to stderr with the `[ambassador:verbose]` prefix.
+They show context downloads, Hermes turns, email proposal and card delivery,
+website request status/timing, Google permission and token-refresh checks, and
+Gmail's HTTP status, error message, and reason. The listener requests diagnostics
+from authenticated worker endpoints so Gmail failures also appear in its terminal.
+Review IDs and account phones use hashed correlation IDs; credentials, bearer
+links, request payloads, and email bodies are omitted or redacted.
+
+For example, `stage: gmail_submit` with `httpStatus: 403` and
+`reason: accessNotConfigured` identifies a Gmail API configuration failure.
+`stage: google_access` with `status: invalid_grant` identifies a token-refresh
+failure before sending. These are examples, not a diagnosis of a previous send.
+
+Restart the listener after changing this setting. The website must run the updated
+code; restart its process too when using a production build. Default logging
+remains unchanged when verbose mode is disabled. Logging never retries a send.
 
 ## Check
 
 ```sh
-python3 -B -m unittest -v test_fetch_context.py test_widget.py test_listen.py test_get_response.py test_send_email.py
+python3 -B -m unittest -v test_diagnostics.py test_fetch_context.py test_widget.py test_listen.py test_get_response.py test_send_email.py test_email_templates.py test_email_attachments.py test_calendar_tools.py
 node --check widget-sidecar.mjs
 node --check widget.js
-node --test test_review_card.mjs
+node --test test_review_card.mjs test_message_receipts.mjs
 ```
 
 Widget HTTP/state tests are offline. Live card delivery needs Photon credentials,

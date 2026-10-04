@@ -3,6 +3,7 @@ import http from 'node:http';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { createReviewCards } from './review-card.mjs';
+import { acknowledgeMessage } from './message-receipts.mjs';
 
 const require = createRequire(process.env.PHOTON_SDK_SIDECAR);
 const { Spectrum, app: miniApp } = await import(pathToFileURL(require.resolve('spectrum-ts')));
@@ -42,7 +43,7 @@ const server = http.createServer(async (req, res) => {
     let raw = '';
     for await (const chunk of req) {
       raw += chunk;
-      if (Buffer.byteLength(raw) > 16384) return json(413, { ok: false });
+      if (Buffer.byteLength(raw) > 128 * 1024) return json(413, { ok: false });
     }
     const { spaceId, url, reviewId, action, kind, text, recipientPhone, organizerPhone } = JSON.parse(raw);
     if (typeof reviewId !== 'string' || !reviewId) throw new Error('Review ID required');
@@ -64,8 +65,8 @@ const server = http.createServer(async (req, res) => {
         space = spaces.get(spaceId);
         if (!space && spaceId) space = await im.space.get(spaceId);
       }
-      if (!space) throw new Error('Photon conversation unavailable for approved recipient');
-      // Cache promise before provider call so concurrent approval retries cannot double-send.
+      if (!space) throw new Error('Photon conversation unavailable for recipient');
+      // Cache promise before provider call so concurrent retries cannot double-send.
       const sending = Promise.resolve().then(async () => {
         const sent = await space.send(text);
         if (!sent?.id) throw new Error('Photon returned no outbound message ID; delivery may be uncertain');
@@ -108,6 +109,7 @@ server.listen(Number(process.env.PHOTON_SIDECAR_PORT || 8791), '127.0.0.1');
 try {
   for await (const [space, message] of spectrum.messages) {
     if (space.type !== 'dm') continue;
+    await acknowledgeMessage(message);
     let content = message.content;
     if (content.type === 'reply') content = content.content;
     if (content.type !== 'text') continue;

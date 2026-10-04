@@ -1,7 +1,7 @@
 import { normalizePhone, safeEqual } from './auth.mjs';
 import { database } from './db.mjs';
 import { documentsForPhone, documentForOwner } from './documents.mjs';
-import { readObject } from './files.mjs';
+import { readObject, downloadUrl } from './files.mjs';
 
 const privateHeaders = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
 
@@ -18,7 +18,7 @@ export async function contextForPhone(phoneNumber) {
     sql`SELECT data FROM ambassador_event WHERE id='main'`,
     sql`SELECT s.id,s.data FROM ambassador_sponsors s JOIN ambassador_user_companies c ON c.company_id=s.id WHERE c.phone_number=${phone} ORDER BY s.id`,
     sql`SELECT DISTINCT a.id,a.sponsor_id,a.kind,a.data,a.created_at FROM ambassador_activities a LEFT JOIN ambassador_user_companies c ON c.company_id=a.sponsor_id WHERE a.owner_phone_number=${phone} OR c.phone_number=${phone} ORDER BY a.created_at DESC`,
-    documentsForPhone(phone),
+    documentsForPhone(phone,{downloadLinks:true}),
   ]);
   return {
     phoneNumber: phone,
@@ -30,7 +30,7 @@ export async function contextForPhone(phoneNumber) {
   };
 }
 
-export function createContextHandlers({ readContext = contextForPhone, readDocument = documentForOwner, readStoredObject = readObject } = {}) {
+export function createContextHandlers({ readContext = contextForPhone, readDocument = documentForOwner, readStoredObject = readObject, signDownload = downloadUrl } = {}) {
   const error = (message, status) => Response.json({ error: message }, { status, headers: privateHeaders });
   function owner(request) {
     if (!agentAuthorized(request)) return error('Agent authentication required.', 401);
@@ -55,6 +55,7 @@ export function createContextHandlers({ readContext = contextForPhone, readDocum
         if (typeof id !== 'string' || !/^[\w-]{1,100}$/.test(id)) return error('Document not found.', 404);
         const file = await readDocument(id, phone);
         if (!file) return error('Document not found.', 404);
+        if(file.object_key&&new URL(request.url).searchParams.get('download')==='link')return Response.json({downloadUrl:await signDownload(file.object_key,file.name)},{headers:privateHeaders});
         const bytes = file.object_key ? await readStoredObject(file.object_key) : Buffer.from(file.content, 'base64');
         return new Response(bytes, { headers: {
           ...privateHeaders, 'Content-Type': file.mime,

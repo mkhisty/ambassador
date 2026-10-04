@@ -52,11 +52,11 @@ The initial account is `+17344199492`, using the existing workspace password as 
 
 Run `npm run db:migrate` before enabling the new login. `npm run db:setup-owner` is a one-time, explicit reassignment of all current documents to the requested initial owner; do not run it after multiple users start uploading private files. Normal migrations never assign unowned legacy files automatically.
 
-PDF, DOCX, TXT, MD, CSV, and XLSX files up to 2 MB each can be uploaded in bulk. Uploaded files are stored intact and downloaded as attachments; no AI extraction is performed yet.
+PDF, DOCX, TXT, MD, CSV, and XLSX files can be uploaded in bulk. Uploaded files are stored intact and downloaded as attachments; no AI extraction is performed yet.
 
-All live document uploads and original contact-import spreadsheets store their bytes in a **private S3-compatible bucket**. Postgres stores file metadata, ownership, and structured contact records. Missing bucket settings reject uploads; there is no database-byte fallback. Provision a private bucket and set `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` from its credentials. The backend writes file bytes to that bucket and metadata to Postgres. Contact imports save the original spreadsheet and contact records together; a failed database transaction cleans up the newly uploaded object. Existing Postgres-backed files remain downloadable. Run `npm run files:migrate` after configuring the bucket to move existing files: it verifies downloaded S3 bytes before removing database bytes. Keep access credentials valid for the bucket and branch where each file lives; do not point a production database at a preview bucket.
+All live document uploads and original contact-import spreadsheets store their bytes in a **private S3-compatible bucket**. Postgres stores file metadata, ownership, and structured contact records. Missing bucket settings reject uploads; there is no database-byte fallback. Provision a private bucket and set `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` (legacy `S3_*` names also work). Set `AWS_S3_BUCKET` when multiple buckets exist; a single bucket is selected automatically from its credentials. The browser uploads bytes directly through a short-lived signed URL; the backend verifies and freezes the object, then records metadata in Postgres. Contact imports save the original spreadsheet and contact records together; a failed database transaction cleans up the newly uploaded object. Existing Postgres-backed files remain downloadable. Run `npm run files:migrate` after configuring the bucket to move existing files: it verifies downloaded S3 bytes before removing database bytes. Keep access credentials valid for the bucket and branch where each file lives; do not point a production database at a preview bucket.
 
-Document downloads require an organizer session. Database and object storage credentials never enter the browser. Upload limits keep requests within ordinary Vercel request payload limits. For large decks and archives, add direct signed uploads rather than raising this endpoint's limit.
+Document downloads require an organizer session. Database and object storage credentials never enter the browser. Uploads and downloads bypass Vercel body limits through private signed bucket URLs. There is no application per-file size cap; the worker retains its 256 MiB total context budget, and email attachments retain their 25 MB combined limit.
 
 ## Imports and charts
 
@@ -170,6 +170,12 @@ Import this GitHub repository, select Next.js, and set **Root Directory** to `we
 
 ## Verify
 
+For server-side Google/Gmail diagnostics, set `AMBASSADOR_VERBOSE=1` in
+`web/.env.local` and restart the website. The worker's `python3 listen.py --verbose`
+also requests diagnostics for its authenticated calls, including provider HTTP
+status, error message/reason, and the failing stage. Tokens, credentials, MIME,
+and email bodies are not logged. Logs use the `[ambassador:verbose]` prefix.
+
 ```powershell
 npm test
 npm run build
@@ -180,3 +186,14 @@ After adding Neon credentials and running migrations, `npm run db:check` verifie
 Tests cover CSV parsing, import mapping, duplicates, validation, file limits, Sankey conservation, financial totals, and signed sessions. Browser verification covers navigation and demo persistence. Live Neon/S3 verification requires account credentials.
 
 This workspace's Neon Postgres connection has been verified with `db:check`: sponsor reads/writes, atomic stage history, duplicate handling, and stored document bytes passed. The optional S3 configuration remains unverified until bucket credentials are supplied.
+
+### Enable larger files on an existing installation
+
+Run `npm run db:migrate-document-size` to remove the old database constraint.
+With the bucket credentials in `.env.local`, run:
+
+```sh
+npm run files:cors -- https://your-site.vercel.app http://127.0.0.1:3000
+```
+
+Use your actual deployed and local website origins. This preserves other CORS rules and enables direct PUT uploads and GET downloads. Redeploy the website and restart the worker. Failed uploads can leave temporary `/upload` objects; a bucket lifecycle rule can expire those objects after one day. Saved documents use separate keys and must be retained.

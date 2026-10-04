@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STAGES, validateSponsor, validateEvent, validateUser, totals, outreachTotals, stageLabel, flowData, MAX_FILE_BYTES } from '../lib/model.mjs';
+import { STAGES, validateSponsor, validateEvent, validateUser, totals, outreachTotals, stageLabel, flowData } from '../lib/model.mjs';
 import { parseCSV, guessMapping, prepareImport, readSpreadsheet } from '../lib/import.mjs';
 import { demoWorkspace } from '../lib/demo.mjs';
 import { safeEqual, normalizePhone, hashPassword, checkPassword, sessionPhone, signSession, validSession, authorized, sameOrigin } from '../lib/auth.mjs';
@@ -67,11 +67,12 @@ test('Totals separate money states; Sankey conserves sponsors and reflects curre
   assert.equal(flowData([{id:'1',stage:'Qualified'}]).links.at(-1).target,'stage:Qualified');
   assert.deepEqual(flowData([]),{nodes:[],links:[]});
 });
-test('File boundary checks reject unsupported and oversized uploads',()=>{
+test('File validation accepts large uploads and rejects unsupported or invalid files',()=>{
   assert.equal(validateFile('strategy.pdf',123),'application/pdf');
   assert.throws(()=>validateFile('page.html',100),/Upload/);
-  assert.throws(()=>validateFile('notes.txt',MAX_FILE_BYTES+1),/2 MB/);
-  assert.throws(()=>validateFile('notes.txt',0),/2 MB/);
+  assert.equal(validateFile('notes.txt',10*1024*1024),'text/plain');
+  assert.throws(()=>validateFile('notes.txt',Number.MAX_SAFE_INTEGER+1),/positive/);
+  assert.throws(()=>validateFile('notes.txt',0),/positive/);
 });
 
 test('26-account demo and generated worker/CSV fixtures stay aligned with phone profiles and strategies',async()=>{

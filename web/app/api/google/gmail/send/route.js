@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { authorized, configured, sessionPhone } from '../../../../../lib/auth.mjs';
 import { database } from '../../../../../lib/db.mjs';
 import { googleAccessToken } from '../../../../../lib/google.mjs';
+import { verboseLog, providerError, errorInfo } from '../../../../../lib/diagnostics.mjs';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -54,6 +55,7 @@ export async function POST(request) {
       return NextResponse.json({error:'Gmail outcome is unknown. Check Sent before taking further action.',status:'send_unknown'},{status:502});
     }
     if(!response.ok||!result.id) {
+      verboseLog('gmail.browser_send_rejected',{draftId,provider:providerError(result,response.status)});
       if(response.status>=500){
         await sql`UPDATE ambassador_outreach_drafts SET status='send_unknown',send_error='Gmail response was inconclusive; check Sent before retrying.',updated_at=now() WHERE id=${draftId} AND owner_phone_number=${phone} AND status='sending'`;
         return NextResponse.json({error:'Gmail outcome is unknown. Check Sent before taking further action.',status:'send_unknown'},{status:502});
@@ -63,9 +65,10 @@ export async function POST(request) {
       return NextResponse.json({error:'Gmail rejected the approved email. Draft remains recorded; review it before creating another send attempt.',status:'failed'},{status:502});
     }
     const activityId=randomUUID();
-    await sql`WITH sent AS (UPDATE ambassador_outreach_drafts SET status='sent',google_message_id=${result.id},sent_at=now(),send_error=NULL,updated_at=now() WHERE id=${draftId} AND owner_phone_number=${phone} AND status='sending' RETURNING sponsor_id,recipient,subject,google_message_id) INSERT INTO ambassador_activities(id,sponsor_id,owner_phone_number,kind,data) SELECT ${activityId},sponsor_id,${phone},'email_sent',jsonb_build_object('text','Approved email sent','recipient',recipient,'subject',subject,'provider','gmail','providerMessageId',google_message_id,'actor',${phone}) FROM sent RETURNING id`;
+    await sql`WITH sent AS (UPDATE ambassador_outreach_drafts SET status='sent',google_message_id=${result.id},sent_at=now(),send_error=NULL,updated_at=now() WHERE id=${draftId} AND owner_phone_number=${phone} AND status='sending' RETURNING sponsor_id,recipient,subject,google_message_id) INSERT INTO ambassador_activities(id,sponsor_id,owner_phone_number,kind,data) SELECT ${activityId},sponsor_id,${phone},'email_sent',jsonb_build_object('text','Approved email sent','recipient',recipient,'subject',subject,'provider','gmail','providerMessageId',google_message_id,'actor',${phone}::text) FROM sent RETURNING id`;
     return NextResponse.json({ok:true,status:'sent',messageId:result.id},{headers:{'Cache-Control':'no-store'}});
   } catch(error) {
+    verboseLog('gmail.browser_send_failed',{error:errorInfo(error)});
     if(claimed&&sql&&phone) {
       try { await sql`UPDATE ambassador_outreach_drafts SET status='send_unknown',send_error='Provider accepted or outcome could not be recorded; check Gmail before retrying.',updated_at=now() WHERE id=${claimed.id} AND owner_phone_number=${phone} AND status='sending'`; } catch {}
     }

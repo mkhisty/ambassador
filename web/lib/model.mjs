@@ -5,7 +5,7 @@ export const stageLabel = stage => STAGE_LABELS[stage] || stage;
 export function outreachTotals(contacts) {
   return {total:contacts.length,awaitingReply:contacts.filter(c=>c.stage==='Contacted').length,responses:contacts.filter(c=>['Replied','Negotiating','Committed'].includes(c.stage)).length,completed:contacts.filter(c=>c.stage==='Committed').length};
 }
-export const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
 export const DEFAULT_EVENT = { name: 'Your outreach campaign', date: '', location: '', attendees: 0, goal: 25000, outcomeGoal:0, audience:'', pitch: '', benefits: '' };
 
 export function validateUser(input) {

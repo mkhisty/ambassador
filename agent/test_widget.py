@@ -2,12 +2,13 @@ import concurrent.futures
 import json
 import secrets
 import threading
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 import urllib.error
 import urllib.request
-from widget import ReviewStore, render, start_widget_server
+from widget import ReviewStore, EmailApprovalError, render, start_widget_server
 
 
 class ReviewTests(unittest.TestCase):
@@ -99,6 +100,86 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(result['action'], 'reject')
         self.assertEqual(created, [])
 
+    def email_store(self, send):
+        self.outcomes = []
+        store = ReviewStore(emit=self.responses.append, clock=lambda: self.now,
+                            on_email_approve=send,
+                            on_email_reject=lambda *args: None,
+                            on_email_outcome=lambda key, event, outcome: self.outcomes.append((key, event, outcome)))
+        proposal = {'reviewId': 'email-1', 'recipient': 'jamie@example.com',
+                    'subject': 'Subject', 'body': 'Original email',
+                    'cc': [], 'bcc': [], 'attachmentRefs': []}
+        key = store.create(proposal['body'], self.event, email_proposal=proposal)
+        return store, key, proposal
+
+    def test_email_approval_sends_once_and_reports_actual_provider_result(self):
+        sends = []
+        provider = {'status': 'accepted', 'messageId': 'gmail-message'}
+        store, key, proposal = self.email_store(lambda *args: sends.append(args) or provider)
+        self.assertEqual(sends, [])
+        result = store.submit(key, {'action': 'approve'})
+        self.assertEqual(sends, [(key, '+12025550100', proposal)])
+        self.assertEqual(result['email_result'], provider)
+        self.assertEqual(self.outcomes[0][2]['status'], 'accepted')
+        self.assertEqual(self.outcomes[0][2]['provider'], provider)
+        with self.assertRaises(RuntimeError):
+            store.submit(key, {'action': 'approve'})
+        self.assertEqual(len(self.outcomes), 1)
+
+    def test_email_rejection_never_sends_and_reports_rejection(self):
+        store, key, proposal = self.email_store(lambda *args: self.fail('rejected email must not send'))
+        store.submit(key, {'action': 'reject'})
+        self.assertEqual(self.outcomes[0][2]['status'], 'rejected')
+        self.assertEqual(self.outcomes[0][2]['proposal'], proposal)
+
+    def test_edited_email_reports_and_sends_exact_reviewed_fields(self):
+        sends = []
+        store, key, proposal = self.email_store(lambda *args: sends.append(args) or {'status': 'accepted', 'messageId': 'gmail'})
+        edited = {name: value for name, value in proposal.items() if name != 'reviewId'}
+        edited.update(recipient='other@example.com', subject='Edited subject', body='Edited body')
+        store.submit(key, {'action': 'edit_approve', 'text': 'Edited body', 'email': edited})
+        self.assertEqual(sends[0][2]['body'], 'Edited body')
+        self.assertEqual(sends[0][2]['recipient'], 'other@example.com')
+        self.assertEqual(self.outcomes[0][2]['proposal']['subject'], 'Edited subject')
+
+    def test_email_failure_reports_uncertainty_and_never_retries(self):
+        def fail(*args):
+            raise ConnectionError('lost provider response')
+        store, key, _ = self.email_store(fail)
+        with self.assertRaisesRegex(RuntimeError, 'uncertain'):
+            store.submit(key, {'action': 'approve'})
+        self.assertEqual(self.outcomes[0][2]['status'], 'uncertain')
+        self.assertEqual(store.get(key)['delivery'], 'uncertain')
+        with self.assertRaises(RuntimeError):
+            store.submit(key, {'action': 'approve'})
+        self.assertEqual(len(self.outcomes), 1)
+
+    def test_definite_email_failure_is_reported_as_not_sent(self):
+        def fail(*args):
+            raise EmailApprovalError('Google is disconnected', 'not_sent')
+        store, key, _ = self.email_store(fail)
+        with self.assertRaisesRegex(RuntimeError, 'did not send'):
+            store.submit(key, {'action': 'approve'})
+        self.assertEqual(self.outcomes[0][2]['status'], 'not_sent')
+        self.assertIn('<h1>Email not sent</h1>', render(store.get(key)))
+
+    def test_pending_email_feedback_survives_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'reviews.json'
+            store = ReviewStore(emit=lambda result: None, clock=lambda: self.now, state_path=path)
+            proposal = {'reviewId': 'pending-email', 'recipient': 'jamie@example.com', 'subject': 'Hello', 'body': 'Email'}
+            key = store.create('Email', self.event, email_proposal=proposal)
+            store.submit(key, {'action': 'reject'})
+            self.assertEqual(store.pending_email_feedback(), [key])
+            queued = []
+            recovered = ReviewStore(clock=lambda: self.now, state_path=path, on_email_outcome=lambda *args: queued.append(args))
+            recovered.queue_email_feedback(key)
+            recovered.queue_email_feedback(key)
+            self.assertEqual(len(queued), 1)
+            self.assertEqual(queued[0][2]['status'], 'rejected')
+            recovered.mark_feedback_sent(key)
+            self.assertEqual(recovered.pending_email_feedback(), [])
+
     def test_message_sends_only_after_approval_and_inbound_is_deduplicated(self):
         sends = []
         self.store.on_message_approve = lambda event, text, key: sends.append((event['messageId'], text)) or {'messageId': 'outbound-1'}
@@ -155,6 +236,94 @@ class ReviewTests(unittest.TestCase):
         self.assertFalse(release.is_set())
         self.assertEqual(self.store.get(key)['result']['action'], 'approve')
         self.assertEqual(len(self.responses), 1)
+
+    def test_http_email_approval_returns_before_provider_finishes(self):
+        started, release, completed = threading.Event(), threading.Event(), threading.Event()
+        def send(*args):
+            started.set()
+            release.wait(timeout=5)
+            return {'status': 'accepted', 'messageId': 'background-message'}
+        store, key, proposal = self.email_store(send)
+        def outcome(key, event, result):
+            self.outcomes.append((key, event, result))
+            completed.set()
+        store.on_email_outcome = outcome
+        server = start_widget_server(store, port=0)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        self.addCleanup(release.set)
+        request = urllib.request.Request(f'http://127.0.0.1:{server.server_port}/review/{key}',
+            data=b'{"action":"approve"}', headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(request, timeout=1) as response:
+            self.assertEqual(response.status, 202)
+            self.assertEqual(json.load(response)['email']['status'], 'queued')
+        self.assertTrue(started.wait(timeout=1))
+        self.assertFalse(release.is_set())
+        self.assertEqual(self.outcomes, [])
+        page = render(store.get(key))
+        self.assertIn('<h1>Approved</h1>', page)
+        self.assertIn('Done. You can close this window.', page)
+        self.assertNotIn('<h1>Delivery uncertain</h1>', page)
+        with self.assertRaises(RuntimeError):
+            store.submit(key, {'action': 'approve'}, defer_email=True)
+        release.set()
+        self.assertTrue(completed.wait(timeout=1))
+        self.assertEqual(self.outcomes[0][2]['status'], 'accepted')
+        self.assertEqual(store.get(key)['delivery'], 'sent')
+
+    def test_queued_edited_email_survives_restart_and_starts_only_once(self):
+        completed, started, release = threading.Event(), threading.Event(), threading.Event()
+        sends = []
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / 'reviews.json'
+            store = ReviewStore(state_path=state, emit=lambda result: None)
+            proposal = {'reviewId': 'queued-email', 'recipient': 'jamie@example.com',
+                        'subject': 'Original', 'body': 'Original body'}
+            key = store.create(proposal['body'], self.event, email_proposal=proposal)
+            reviewed = {'recipient': 'new@example.com', 'subject': 'Edited', 'body': 'Reviewed text'}
+            result = store.submit(key, {'action': 'edit_approve', 'email': reviewed}, defer_email=True)
+            self.assertEqual(result['email_result']['status'], 'queued')
+            self.assertEqual(store.pending_email_sends(), [key])
+            def send(*args):
+                sends.append(args)
+                started.set()
+                release.wait(timeout=5)
+                return {'status': 'accepted', 'messageId': 'background-message'}
+            recovered = ReviewStore(state_path=state, emit=lambda result: None,
+                on_email_approve=send, on_email_outcome=lambda *args: completed.set())
+            self.assertEqual(recovered.pending_email_sends(), [key])
+            self.assertTrue(recovered.start_email(key))
+            try:
+                self.assertTrue(started.wait(timeout=1))
+                self.assertFalse(recovered.start_email(key))
+                self.assertEqual(sends[0][2]['recipient'], 'new@example.com')
+                self.assertEqual(sends[0][2]['body'], 'Reviewed text')
+                # An in-flight send is never automatically resumed after a crash.
+                crashed = ReviewStore(state_path=state)
+                self.assertEqual(crashed.pending_email_sends(), [])
+                self.assertEqual(crashed.get(key)['delivery'], 'uncertain')
+            finally:
+                release.set()
+                self.assertTrue(completed.wait(timeout=1))
+
+    def test_background_failure_reports_outcome_after_recorded_approval(self):
+        completed = threading.Event()
+        def send(*args):
+            raise EmailApprovalError('Google is disconnected', 'not_sent')
+        store, key, proposal = self.email_store(send)
+        def outcome(key, event, result):
+            self.outcomes.append((key, event, result))
+            completed.set()
+        store.on_email_outcome = outcome
+        queued = store.submit(key, {'action': 'approve'}, defer_email=True)
+        self.assertEqual(queued['email_result']['status'], 'queued')
+        self.assertEqual(self.outcomes, [])
+        with patch('builtins.print'):
+            self.assertTrue(store.start_email(key))
+            self.assertTrue(completed.wait(timeout=1))
+        self.assertEqual(self.outcomes[0][2]['status'], 'not_sent')
+        self.assertEqual(store.get(key)['delivery'], 'not_sent')
+        self.assertFalse(store.start_email(key))
 
     def test_http_get_does_not_approve_post_records_and_reload_shows_result(self):
         server = start_widget_server(self.store, port=0)

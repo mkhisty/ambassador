@@ -1,7 +1,6 @@
-import { validateSponsor, duplicateKey, MAX_FILE_BYTES } from './model.mjs';
+import { validateSponsor, duplicateKey } from './model.mjs';
 
 export async function readSpreadsheet(file) {
-  if(file.size>MAX_FILE_BYTES)throw new Error('Maximum spreadsheet size is 2 MB.');
   let rows;
   if(file.name.toLowerCase().endsWith('.csv'))rows=parseCSV(await file.text());
   else if(file.name.toLowerCase().endsWith('.xlsx')) {

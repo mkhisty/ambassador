@@ -7,7 +7,6 @@ export const runtime='nodejs';
 export async function POST(request) {
   if(!authorized(request))return NextResponse.json({error:'Sign in to import contacts.'},{status:401});
   const owner=sessionPhone(request);
-  if(Number(request.headers.get('content-length'))>4300000)return NextResponse.json({error:'Import request too large.'},{status:413});
   try {
     const form=await request.formData(),file=form.get('file'),raw=form.get('sponsors');
     if(!file||!/^.+\.(csv|xlsx)$/i.test(file.name))throw new Error('Choose a CSV or XLSX spreadsheet.');
