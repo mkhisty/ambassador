@@ -23,7 +23,7 @@ function validate(input) {
 
 export async function POST(request) {
   if(!agentAuthorized(request))return Response.json({error:'Agent authentication required.'},{status:401,headers:privateHeaders});
-  if(!configured())return Response.json({error:'Neon is not connected.'},{status:503,headers:privateHeaders});
+  if(!configured())return Response.json({error:'Email drafts are temporarily unavailable.'},{status:503,headers:privateHeaders});
   const verbose=verboseEnabled(request);
   try {
     const raw=await request.text();if(Buffer.byteLength(raw)>30000)return Response.json({error:'Request too large.'},{status:413,headers:privateHeaders});

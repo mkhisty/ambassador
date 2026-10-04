@@ -21,9 +21,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from widget import ReviewStore, EmailApprovalError, start_widget_server
 import get_response
-from fetch_context import context_settings, normalize_phone, NoRedirect, read_api, read_document
+from fetch_context import context_settings, normalize_phone, NoRedirect, read_api, read_document, website_headers
 from calendar_tools import calendar_proposal, create_approved_event
 from email_templates import expanded_emails
+from gmail_inbox import inbox_loop
 from diagnostics import verbose_enabled, verbose_headers, verbose_log, fingerprint, error_info
 
 HOME = Path.home() / ".hermes"
@@ -77,7 +78,7 @@ def record_outcome(event, event_id, text, provider_message_id=None):
     request = urllib.request.Request(
         base + '/api/agent/outreach',
         data=json.dumps(body).encode(),
-        headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+        headers={**website_headers(token), 'Content-Type': 'application/json'},
     )
     with urllib.request.urlopen(request, timeout=10) as response:
         result = json.load(response)
@@ -91,7 +92,7 @@ def post_website(path, body, timeout=30):
     verbose_log('website.request', path=path, review=fingerprint(body.get('reviewId')))
     base, token = context_settings()
     request = urllib.request.Request(base + path, data=json.dumps(body).encode(),
-                                     headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', **verbose_headers()})
+                                     headers={**website_headers(token), 'Content-Type': 'application/json', **verbose_headers()})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             result = json.load(response)
@@ -179,6 +180,8 @@ def request_email_review(token, reviews, public_url, event, proposal):
     """Called by the email tool; save exact fields before sending the approval card."""
     if reviews.has_message(event.get('messageId')):
         raise RuntimeError('An email review already exists for this request.')
+    if event.get('gmailMessageId'):
+        proposal['incomingMessageId'] = event['gmailMessageId']
     for child_id, message in expanded_emails(proposal):
         saved = post_website('/api/agent/google/gmail/drafts', {
             'phoneNumber': event['sender']['id'], 'reviewId': child_id, 'proposal': message,
@@ -357,6 +360,7 @@ def main():
     server = start_widget_server(reviews, env.get("WIDGET_BIND", "127.0.0.1"),
                                  int(env.get("WIDGET_PORT", "8792")))
     proc = None
+    inbox_stop = threading.Event()
     try:
         proc = subprocess.Popen([node, str(SIDECAR)], cwd=SIDECAR.parent, env=env)
         deadline = time.monotonic() + 30
@@ -374,6 +378,13 @@ def main():
         print("Listening. Ctrl-C to stop.", flush=True)
         recover_review_cards(token, reviews, public_url)
         threading.Thread(target=email_feedback_loop, args=(token, reviews, feedback), daemon=True).start()
+        if env.get('GMAIL_INBOX_ENABLED', '1').lower() not in ('0', 'false', 'no'):
+            threading.Thread(target=inbox_loop, args=(post_website, reviews,
+                get_response.get_response_with_context,
+                lambda event, proposal: request_email_review(token, reviews, public_url, event, proposal),
+                lambda event, reply, response_id: send_response(token, reviews, event, reply, response_id),
+                get_response.CONVERSATION_LOCK, inbox_stop,
+                lambda: recover_review_cards(token, reviews, public_url)), daemon=True).start()
         for key in reviews.pending_email_feedback():
             reviews.queue_email_feedback(key)
         for key in reviews.pending_email_sends():
@@ -387,6 +398,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        inbox_stop.set()
         server.shutdown()
         server.server_close()
         if proc is not None and proc.poll() is None:

@@ -8,7 +8,7 @@ export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
 export async function POST(request) {
-  if (!configured()) return NextResponse.json({error:'Connect Neon before linking Google.'},{status:503});
+  if (!configured()) return NextResponse.json({error:'Google connection is temporarily unavailable.'},{status:503});
   if (!authorized(request)) return NextResponse.json({error:'Sign in to connect Google.'},{status:401});
   try {
     const config=googleConfig();tokenKey();
@@ -18,6 +18,6 @@ export async function POST(request) {
     return NextResponse.json({url:authorizationUrl(state,config)},{headers:{'Cache-Control':'no-store'}});
   } catch (error) {
     console.error('Google connection could not start:',error.code||error.name);
-    return NextResponse.json({error:error.message||'Google connection is not configured.'},{status:503});
+    return NextResponse.json({error:'Could not connect Google. Try again later.'},{status:503});
   }
 }

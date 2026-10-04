@@ -3,7 +3,7 @@ import logo from '../assets/logo.png';
 
 export const metadata = {
   title: 'Ambassador — Outreach campaigns',
-  description: 'Plan outreach campaigns, manage contacts, and track responses, follow-ups, and outcomes through conversations with Photon Spectrum.',
+  description: 'Plan outreach campaigns, manage contacts, and track responses, follow-ups, and outcomes.',
   icons: { icon: { url: logo.src, type: 'image/png' }, apple: logo.src },
 };
 

@@ -6,7 +6,7 @@ import { createCalendarEvent } from '../../../../../lib/google-calendar.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export async function POST(request) {
-  if (!configured()) return NextResponse.json({error:'Neon is not connected.'},{status:503});
+  if (!configured()) return NextResponse.json({error:'Calendar is temporarily unavailable.'},{status:503});
   if (!authorized(request)) return NextResponse.json({error:'Sign in before creating a Calendar event.'},{status:401});
   try {
     const text=await request.text();if(Buffer.byteLength(text)>12000)return NextResponse.json({error:'Event is too large.'},{status:413});

@@ -3,6 +3,7 @@ import { configured, normalizePhone } from '../../../../../../lib/auth.mjs';
 import { agentAuthorized } from '../../../../../../lib/agent-context.mjs';
 import { database } from '../../../../../../lib/db.mjs';
 import { googleAccessToken } from '../../../../../../lib/google.mjs';
+import { gmailReply, gmailSendRequest } from '../../../../../../lib/gmail-reply.mjs';
 import { readObject } from '../../../../../../lib/files.mjs';
 import { MAX_EMAIL_ATTACHMENTS, checkAttachmentTotal, encodeEmailMime, attachmentHeaders } from '../../../../../../lib/email-attachments.mjs';
 import { verboseEnabled, verboseLog, providerError, errorInfo, fingerprint } from '../../../../../../lib/diagnostics.mjs';
@@ -20,13 +21,13 @@ function validate(input) {
   const emails=value=>Array.isArray(value)&&value.length<=20&&value.every(item=>typeof item==='string'&&item.length<=500&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item)&&!/[\r\n]/.test(item));
   const attachmentRefs=proposal.attachmentRefs||[];
   if(!emails(proposal.cc||[])||!emails(proposal.bcc||[])||!Array.isArray(attachmentRefs)||attachmentRefs.length>MAX_EMAIL_ATTACHMENTS||attachmentRefs.some(id=>typeof id!=='string'||id.length>100))throw Object.assign(new Error('Invalid CC, BCC, or attachment references.'),{status:400});
-  return {reviewId,proposal:{recipient,subject,body,cc:proposal.cc||[],bcc:proposal.bcc||[],attachmentRefs,replyTo:proposal.replyTo||''}};
+  return {reviewId,proposal:{recipient,subject,body,cc:proposal.cc||[],bcc:proposal.bcc||[],attachmentRefs,replyTo:proposal.replyTo||'',incomingMessageId:proposal.incomingMessageId||null}};
 }
 
 function encodedHeader(value){return `=?UTF-8?B?${Buffer.from(value,'utf8').toString('base64')}?=`;}
 function wrappedBase64(bytes){return bytes.toString('base64').replace(/.{1,76}/g,'$&\r\n').trimEnd();}
-async function rawMessage(sql,phone,proposal) {
-  const headers=[`To: ${proposal.recipient}`,`Subject: ${encodedHeader(proposal.subject)}`];
+async function rawMessage(sql,phone,proposal,replyHeaders=[]) {
+  const headers=[`To: ${proposal.recipient}`,`Subject: ${encodedHeader(proposal.subject)}`,...replyHeaders];
   if(proposal.cc.length)headers.push(`Cc: ${proposal.cc.join(', ')}`);
   if(proposal.bcc.length)headers.push(`Bcc: ${proposal.bcc.join(', ')}`);
   if(proposal.replyTo){if(typeof proposal.replyTo!=='string'||proposal.replyTo.length>500||/[\r\n]/.test(proposal.replyTo)||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(proposal.replyTo))throw Object.assign(new Error('Invalid reply-to address.'),{status:400});headers.push(`Reply-To: ${proposal.replyTo}`);}
@@ -49,7 +50,7 @@ async function rawMessage(sql,phone,proposal) {
 
 export async function POST(request) {
   if(!agentAuthorized(request))return Response.json({error:'Agent authentication required.'},{status:401,headers:privateHeaders});
-  if(!configured())return Response.json({error:'Neon is not connected.'},{status:503,headers:privateHeaders});
+  if(!configured())return Response.json({error:'Email sending is temporarily unavailable.'},{status:503,headers:privateHeaders});
   const verbose=verboseEnabled(request);
   let claimed=null,sql,phone,reviewId,stage='validation';
   try {
@@ -63,7 +64,7 @@ export async function POST(request) {
     stage='google_access';
     const {accessToken}=await googleAccessToken(sql,phone,SEND_SCOPE,{verbose,reviewId});
     stage='compose';
-    const proposal=validate(input).proposal,encodedMime=await rawMessage(sql,phone,proposal);
+    const proposal=validate(input).proposal,reply=await gmailReply(sql,phone,proposal.incomingMessageId),encodedMime=await rawMessage(sql,phone,proposal,reply.headers);
     verboseLog('gmail.composed',{review:fingerprint(reviewId),attachmentCount:proposal.attachmentRefs.length,encodedBytes:encodedMime.length},verbose);
     stage='claim_draft';
     const rows=await sql`UPDATE ambassador_outreach_drafts SET recipient=${proposal.recipient},subject=${proposal.subject},body=${proposal.body},cc=${JSON.stringify(proposal.cc)}::jsonb,bcc=${JSON.stringify(proposal.bcc)}::jsonb,attachment_refs=${JSON.stringify(proposal.attachmentRefs)}::jsonb,reply_to=${proposal.replyTo},status='sending',approved_at=now(),send_error=NULL,updated_at=now() WHERE owner_phone_number=${phone} AND review_id=${reviewId} AND status='draft' RETURNING id,sponsor_id`;
@@ -75,10 +76,10 @@ export async function POST(request) {
     try {
       // Upload MIME directly for attachments, avoiding another base64 layer
       // around large messages in the JSON transport.
-      const attached=proposal.attachmentRefs.length>0;
-      response=await fetch(attached?'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media':'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
-        method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':attached?'message/rfc822':'application/json'},
-        body:attached?Buffer.from(encodedMime,'base64url'):JSON.stringify({raw:encodedMime}),signal:AbortSignal.timeout(20000)});
+      const submission=gmailSendRequest(encodedMime,proposal.attachmentRefs.length>0,reply.threadId);
+      response=await fetch(submission.url,{
+        method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':submission.contentType},
+        body:submission.body,signal:AbortSignal.timeout(20000)});
       result=await response.json();
     }catch(error){
       verboseLog('gmail.submit_unknown',{review:fingerprint(reviewId),error:errorInfo(error),httpStatus:response?.status},verbose);

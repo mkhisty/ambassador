@@ -8,7 +8,7 @@ export const dynamic='force-dynamic';
 
 export async function DELETE(request) {
   if (!authorized(request)) return NextResponse.json({error:'Sign in to disconnect Google.'},{status:401});
-  if (!configured()) return NextResponse.json({error:'Neon is not connected.'},{status:503});
+  if (!configured()) return NextResponse.json({error:'Google connection is temporarily unavailable.'},{status:503});
   try {
     const sql=database(),phone=sessionPhone(request),[connection]=await sql`SELECT refresh_token_ciphertext,refresh_token_iv,refresh_token_tag FROM ambassador_google_connections WHERE phone_number=${phone}`;
     let revoked=true;

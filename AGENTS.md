@@ -47,6 +47,19 @@ optional bookkeeping, while attachment access remains owner-scoped.
 Conversation history is currently retained only in memory. Closing the sheet
 remains manual.
 
+Gmail inbox notifications use Cloud Pub/Sub in `password-313816`. A Google-OIDC-
+authenticated webhook coalesces mailbox history notifications into Neon state;
+the Python listener drains a durable owner-scoped inbox queue every 15 seconds.
+It registers/renews watches daily and reconciles history after 10 quiet minutes.
+Initial registration processes future arrivals; expired history recovers inbox
+messages since monitoring began with persisted paging. Sent mail and label-only
+changes never generate drafts. New emails are relevant by default unless there
+is an explicit reason otherwise; mail requiring a response produces an email
+approval card. Approved replies retain Gmail threading, including attachments.
+Google read scope requires reconnection. A Vercel automation token permits Google
+and the worker to reach the chosen protected deployment URL; it is never passed
+to Hermes or storage. Runtime `GMAIL_INBOX_ENABLED=0` disables inbox work.
+
 Email proposals support a shared subject/body template and up to 20 recipients,
 each with parameter values. `[FIELD]` names are case-insensitive; missing values
 block the proposal. The widget highlights fields, displays the shared template
@@ -224,8 +237,8 @@ Remaining work to make developer setup reliably clone-and-run:
   retrying.
 - [ ] **Workspace write-back:** Record provider acceptance and update contact
   activity/status in the website. Distinguish acceptance from delivery.
-- [ ] **Reply handling:** Retrieve email replies, associate them with
-  contacts, and prepare follow-ups for review.
+- [ ] **Reply handling:** Gmail inbox retrieval and follow-up approval are
+  implemented; contact stage/activity association and live verification remain.
 - [ ] **Worker deployment:** Host the long-running listener and widget server
   with stable HTTPS, restart recovery, and operational logs.
 

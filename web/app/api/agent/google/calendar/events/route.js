@@ -8,7 +8,7 @@ export const dynamic='force-dynamic';
 
 export async function POST(request) {
   if(!agentAuthorized(request))return Response.json({error:'Agent authentication required.'},{status:401});
-  if(!configured())return Response.json({error:'Neon is not connected.'},{status:503});
+  if(!configured())return Response.json({error:'Calendar services are temporarily unavailable.'},{status:503});
   try {
     const text=await request.text();if(Buffer.byteLength(text)>12000)return Response.json({error:'Request too large.'},{status:413});
     const input=JSON.parse(text),phone=normalizePhone(input.phoneNumber),requestId=input.requestId;

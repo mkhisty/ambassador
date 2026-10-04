@@ -45,8 +45,20 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def website_headers(token):
+    if not token:
+        return {}
+    from dotenv import dotenv_values
+    local = dotenv_values(AGENT_DIR / '.env.local', interpolate=False)
+    bypass = os.environ.get('VERCEL_AUTOMATION_BYPASS_SECRET') or local.get('VERCEL_AUTOMATION_BYPASS_SECRET')
+    headers = {'Authorization': 'Bearer ' + token}
+    if bypass:
+        headers['x-vercel-protection-bypass'] = bypass
+    return headers
+
+
 def read_api(opener, url, token, limit):
-    request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token} if token else {})
+    request = urllib.request.Request(url, headers=website_headers(token))
     try:
         with opener.open(request, timeout=30) as response:
             body = response.read(limit + 1)
