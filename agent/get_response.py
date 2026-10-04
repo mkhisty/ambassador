@@ -7,7 +7,6 @@ from fetch_context import fetch_context
 from send_email import email_owner, register_email_tool
 
 HERMES_HOME = Path.home() / '.hermes'
-CONTEXT_DIR = Path(__file__).resolve().parent / 'context'
 
 
 def load_hermes():
@@ -22,8 +21,8 @@ def load_hermes():
 
 def get_response(text, phone_number):
     """Refresh the user's context, then prepare a response for review."""
-    fetch_context(phone_number)
-    return generate_response(text, CONTEXT_DIR, phone_number=phone_number)
+    context_directory = fetch_context(phone_number)
+    return generate_response(text, context_directory, phone_number=phone_number)
 
 
 def generate_response(text, context_directory, *, phone_number=None):
@@ -56,6 +55,7 @@ def generate_response(text, context_directory, *, phone_number=None):
         acp_command=runtime.get('command'), acp_args=runtime.get('args'),
         quiet_mode=True, run_budget_seconds=180, skip_background_review=True,
         ephemeral_system_prompt=instructions,
+        cwd=str(context_directory),
     )
     owner_token = email_owner.set(phone_number)
     try:

@@ -16,12 +16,20 @@ decisions through `handle_decision(response)`. `listen.py` handles only messagin
 widget callbacks, and communication service startup/shutdown.
 
 For each incoming message, `get_response` passes the sender's phone number to
-`fetch_context.fetch_context(phone_number)`. This is currently a no-op; it will
-eventually clear and refresh `context/` with that user's files. Nothing is
-fetched or deleted yet. `generate_response(text, context_directory)` instructs
-Hermes to inspect relevant files in that directory and prepare the response
-for review. Missing or empty context is supported. The private `context/`
-directory is ignored by Git.
+`fetch_context.fetch_context(phone_number)`. It authenticates to the website,
+looks up that account, and downloads every owned document. `workspace.json`
+includes the user's profile, shared campaign, linked contacts and activity,
+and a document index with local filenames. Context lives in
+`agent/context/<SHA-256 of normalized phone>/snapshot-*/`; `current` points to
+the latest complete snapshot. Refresh replaces only that user's old files,
+after every download succeeds. A failed refresh preserves the previous snapshot
+and stops drafting instead of reusing stale context. One serial worker per
+context root is supported.
+
+`generate_response(text, context_directory)` runs Hermes with that snapshot as
+its working directory and instructs it to inspect relevant files before preparing
+the response for review. Original documents are preserved; automatic extraction
+into plain text is not implemented. Context is ignored by Git.
 
 `send_email.py` registers a Hermes tool named `send_email`. Hermes supplies
 `to`, `subject`, `text`, and optional `attachment_paths`, `cc`, `bcc`, and
@@ -34,8 +42,8 @@ the `send_email()` function. Live sending and approval wiring are not implemente
 ## Run
 
 The root `requirements.txt` pins the external Hermes Python dependency and
-pulls its declared dependencies. The remaining agent Python code uses the
-standard library. From the repository root, install into your Python environment:
+pulls its declared dependencies, including `python-dotenv` for local configuration.
+From the repository root, install into your Python environment:
 
 ```sh
 python3 -m pip install -r requirements.txt
@@ -49,6 +57,17 @@ are installed with npm, and ngrok is installed separately.
 Requires the existing Hermes runtime and Photon SDK installation. Configure
 Photon with `hermes photon setup` and `hermes photon install-sidecar` if needed.
 The listener uses those credentials and installed SDK without changing Hermes.
+
+Start the website first (`cd web && npm run dev` from the repository root),
+with a configured database and an account matching your incoming iMessage phone.
+Browser-only demo files are not available to the worker. Copy `agent/.env.example`
+to `agent/.env.local` and set `WIDGET_PUBLIC_URL`. `AMBASSADOR_WEB_URL` defaults
+to `http://127.0.0.1:3000`; a hosted website must use its HTTPS origin.
+`AGENT_API_TOKEN` must match the website's token (32+ characters). Locally, a
+blank/omitted token falls back to `web/.env.local`. Only that token is read;
+website database and storage credentials are not loaded into the worker.
+Explicit environment values take priority. Run the following listener commands
+from `agent/`.
 
 Expose the widget server with a public HTTPS URL. For example, in one terminal:
 
@@ -81,7 +100,7 @@ submission. Editing is local until **Approve edited response** is pressed.
 ## Check
 
 ```sh
-python3 -m unittest -v test_widget.py test_listen.py test_get_response.py test_send_email.py
+python3 -B -m unittest -v test_fetch_context.py test_widget.py test_listen.py test_get_response.py test_send_email.py
 node --check widget-sidecar.mjs
 node --check widget.js
 node --test test_review_card.mjs

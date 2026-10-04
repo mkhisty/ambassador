@@ -62,9 +62,31 @@ Sankey widths represent sponsor counts. The three columns show actual outreach c
 
 ## Spectrum integration contract
 
-The website exposes the backend interface but does **not** automatically connect the existing SQLite-based Spectrum worker. Your messaging partner can wire the following operations into that worker while preserving exact-draft approval and send-result checks.
+The Python worker in `agent/` automatically retrieves account context before Hermes drafts. Approval currently logs the decision; sending and workspace write-back remain unfinished.
 
 Set a random `AGENT_API_TOKEN` (32+ characters) in the website's server environment. Call with `Authorization: Bearer <token>` from the worker only:
+
+```http
+GET /api/agent/context?phoneNumber=%2B17344199492
+GET /api/agent/context/documents/<id>?phoneNumber=%2B17344199492
+```
+
+The context response contains `{ phoneNumber, user, campaign, contacts, activities, documents }`.
+Contacts and activity are limited to that profile's company associations;
+campaign settings are shared. Downloads require an ID owned by the selected phone,
+including legacy Postgres bytes and private S3 objects. Unknown accounts/files
+return 404, invalid phones 400, and missing/wrong tokens 401. Responses are
+private and uncached. These are separate worker endpoints; browser file
+routes still require the owner session. Keep the privileged worker token server-side.
+
+Configure `AMBASSADOR_WEB_URL` in `agent/.env.local` with the website origin
+(localhost port 3000 by default) and the same `AGENT_API_TOKEN`. On a local clone,
+the worker can read the token from `web/.env.local`. The worker saves owned
+originals and `workspace.json` into isolated per-phone snapshots, then runs Hermes
+in that directory. Refresh failure stops generation and preserves the old snapshot.
+Browser-only demo files cannot be downloaded by the worker.
+
+The existing workspace API is also available for future write-back:
 
 ```http
 GET /api/workspace
@@ -116,7 +138,7 @@ Send to `POST /api/workspace`. Reusing a phone number updates the same user; it 
 }
 ```
 
-Send that body to `POST /api/workspace`. Mark Contacted only after the provider accepts an organizer-approved message, never after a preview or draft. Reply handling can move to Replied; actual confirmed commitments can move to Committed. An update and its activity record are committed atomically. Bearer tokens are not accepted by document download endpoints.
+Send that body to `POST /api/workspace`. Mark Contacted only after the provider accepts an organizer-approved message, never after a preview or draft. Reply handling can move to Replied; actual confirmed commitments can move to Committed. An update and its activity record are committed atomically. Bearer tokens are not accepted by browser document download endpoints.
 
 Other supported POST bodies: `{ "action": "import", "sponsors": [...] }` and `{ "action": "event", "event": {...} }`. Import batches commit atomically; database uniqueness handles repeated company/contact imports. The dashboard refreshes every 30 seconds when visible, outside editing dialogs.
 

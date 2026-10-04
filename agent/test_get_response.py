@@ -2,20 +2,24 @@ import unittest
 from unittest.mock import Mock, patch
 
 import get_response
-from fetch_context import fetch_context
 
 
 class ResponseTests(unittest.TestCase):
     def test_fetches_phone_context_before_generating_response(self):
         calls = []
-        with patch.object(get_response, 'fetch_context', side_effect=lambda phone: calls.append(('fetch', phone))), \
+        directory = '/tmp/phone-context'
+        with patch.object(get_response, 'fetch_context', side_effect=lambda phone: calls.append(('fetch', phone)) or directory), \
                 patch.object(get_response, 'generate_response', side_effect=lambda text, directory, **kw: calls.append(('generate', text, directory, kw['phone_number'])) or 'Proposal'):
             self.assertEqual(get_response.get_response('Draft a proposal', '+12025550100'), 'Proposal')
         self.assertEqual(calls, [('fetch', '+12025550100'),
-                                 ('generate', 'Draft a proposal', get_response.CONTEXT_DIR, '+12025550100')])
+                                 ('generate', 'Draft a proposal', directory, '+12025550100')])
 
-    def test_context_fetch_placeholder_does_nothing(self):
-        self.assertIsNone(fetch_context('+12025550100'))
+    def test_failed_refresh_does_not_run_hermes_on_stale_context(self):
+        with patch.object(get_response, 'fetch_context', side_effect=RuntimeError('Download failed')), \
+                patch.object(get_response, 'generate_response') as generate:
+            with self.assertRaises(RuntimeError):
+                get_response.get_response('Draft a proposal', '+12025550100')
+            generate.assert_not_called()
 
     def runtime(self, agent):
         constructor = Mock(return_value=agent)
@@ -34,6 +38,7 @@ class ResponseTests(unittest.TestCase):
         agent.close.assert_called_once()
         runtime[3].assert_called_once_with(requested='test-provider', target_model='test-model')
         self.assertEqual(runtime[0].call_args.kwargs['model'], 'resolved-model')
+        self.assertEqual(runtime[0].call_args.kwargs['cwd'], '/tmp/user-context')
         instructions = runtime[0].call_args.kwargs['ephemeral_system_prompt']
         self.assertIn('/tmp/user-context', instructions)
         self.assertIn('Inspect relevant files', instructions)

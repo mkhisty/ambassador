@@ -75,6 +75,8 @@ def main():
     # Hermes may replace this process with its managed Python runtime.
     # Do that before starting servers or the sidecar.
     get_response.load_hermes()
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / '.env.local', override=False)
     env = os.environ.copy()
     public_url = env.get("WIDGET_PUBLIC_URL", "").rstrip("/")
     if not public_url.startswith("https://"):

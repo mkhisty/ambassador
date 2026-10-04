@@ -34,11 +34,17 @@ responses rather than execute outreach. Closing the sheet remains manual.
 
 `agent/listen.py` handles communication and service lifecycle.
 `agent/get_response.py` holds agent logic and instructs Hermes to use a context
-directory. `agent/fetch_context.py` is a no-op. `agent/send_email.py` registers
+directory. `agent/fetch_context.py` downloads every owned document through the
+authenticated website API, plus profile/campaign/linked-contact context. Each
+normalized phone has its own hashed directory; complete snapshots publish
+atomically and replace only that user's previous files. Failed refreshes stop
+drafting and preserve the last complete snapshot. Hermes runs in the new
+snapshot directory. `agent/send_email.py` registers
 a Hermes tool that accepts email fields and attachment paths but returns
 `not_sent`; it does not fetch credentials, read attachments, or send email.
 
-The website and agent are not connected end to end. Phone ownership is not
+The website-to-agent context path is connected. Approval still only logs decisions;
+email sending and workspace write-back remain unfinished. Phone ownership is not
 verified. S3 connectivity and production hosting remain unverified according
 to component documentation. Historical test results are not evidence that
 later edits or live integrations work; run checks relevant to each change.
@@ -53,8 +59,8 @@ version-pinned dependency setup.
 
 The root `requirements.txt` pins the Hermes Python package to revision
 `158fd638da1629c8e62caf9ade1515d162def8ab`; installing it pulls Hermes's
-declared Python dependencies. Ambassador's other Python imports are standard
-library or local modules. The pip manifest does not configure Hermes or install
+declared Python dependencies. `python-dotenv` is also pinned for local configuration;
+other Python imports are standard library or local modules. The pip manifest does not configure Hermes or install
 Photon's Node dependencies. The existing external installation path remains
 required by the listener; a fresh-clone bootstrap is still unfinished.
 
@@ -71,6 +77,13 @@ hermes photon install-sidecar
 See the official [Hermes installation guide](https://hermes-agent.nousresearch.com/docs/getting-started/installation)
 and [Photon setup guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/photon).
 These commands are manual prerequisites, not an Ambassador setup script.
+
+Start the website with its database configured, using `npm run dev` in `web/`.
+Create an account with the phone that will message the agent. Copy
+`agent/.env.example` to `agent/.env.local`; set the widget URL and, for a remote
+website, its HTTPS origin and matching `AGENT_API_TOKEN`. Locally the website
+origin defaults to port 3000 and the token can be read from `web/.env.local`.
+Context never contains database credentials or the agent token.
 
 From the cloned repository, start a tunnel for the review widget:
 
@@ -109,9 +122,9 @@ Remaining work to make developer setup reliably clone-and-run:
 
 - [ ] **Email account connection:** Add OAuth onboarding, connection status,
   disconnect/reconnect, and secure storage of each user's email tokens.
-- [ ] **Agent context API:** Provide authenticated access to the requesting
-  user's profile, campaign context, contacts, and document downloads. The
-  existing agent token does not grant access to private browser document routes.
+- [x] **Agent context API:** Separate token-authenticated routes expose the
+  selected phone's profile, shared campaign, linked contacts/activity, and
+  owned document downloads. Browser document routes still require a phone session.
 - [ ] **Phone verification:** Verify phone ownership and link that identity to
   the connected email account.
 - [ ] **Workspace permissions:** Define access and mutation permissions for
@@ -126,10 +139,10 @@ Remaining work to make developer setup reliably clone-and-run:
 
 ## Agent work remaining (`agent/`)
 
-- [ ] **Context fetching:** Implement `fetch_context(phone_number)` to
-  authenticate to the website, retrieve the user's authorized context, and
-  download their files into an isolated context directory. The eventual
-  refresh must replace that user's context without affecting another user.
+- [x] **Context fetching:** `fetch_context(phone_number)` retrieves owned files
+  into isolated snapshots and refreshes only that account. A failed fetch never
+  starts Hermes using stale files. The implementation supports one serial worker
+  per context root; concurrent workers need locking before sharing a root.
 - [ ] **Document extraction:** Convert supported documents into readable
   context for Hermes while preserving originals for attachments.
 - [ ] **Structured email proposals:** Capture recipient, subject, body,

@@ -27,6 +27,7 @@ The website handles campaign overview, contact management, bulk imports, relatio
 - `lib/db.mjs`: Neon reads and transactional workspace mutations.
 - `lib/auth.mjs`: phone normalization, password hashing, signed sessions, and authorization.
 - `lib/documents.mjs`: owner-filtered document lookup.
+- `lib/agent-context.mjs`: worker context API, profile/contact scoping and owned downloads.
 - `lib/files.mjs`: upload validation and private S3-compatible storage adapter.
 - `db/schema.sql`: additive, idempotent schema setup; `scripts/migrate.mjs` applies it transactionally using the direct Neon endpoint.
 - `lib/demo.mjs`: canonical fictional sample; `scripts/export-demo.mjs` generates CSV, messaging fixtures, and root `STRATEGY.md`.
@@ -34,6 +35,7 @@ The website handles campaign overview, contact management, bulk imports, relatio
 
 ## Implemented interface
 
+- Sign-in and sidebar branding use `assets/logo.png` through a static Next.js image import; the same asset supplies browser and Apple touch icons.
 - Navigation: Overview, Contacts, Documents, Imports, Campaign settings.
 - Overview counts contacts, responses, completed outcomes, and overdue follow-ups. Optional targets count outcomes, not dollars.
 - Sankey widths count contacts. It shows a current snapshot, not historical conversion rates. Stage history remains separate.
@@ -80,7 +82,10 @@ Existing API fields are `event`, `sponsors`, and `sponsorId`. Stored stages rema
 - `POST /api/imports`: authenticated multipart `file` (CSV/XLSX) and `sponsors` (JSON contact list). Original bytes go to S3; contacts, history, and document metadata commit together in Postgres. The original appears in Documents. Missing bucket configuration returns 503.
 - `GET /api/documents/[id]`: private attachment download after owner lookup.
 - `AGENT_API_TOKEN` enables privileged server-to-server workspace access. It does not grant access to the private browser document endpoints. Without a phone session, workspace responses contain no user documents.
-- The existing messaging service is separate and uses SQLite. Live synchronization with this Neon-backed website is not implemented automatically.
+- `GET /api/agent/context?phoneNumber=...`: worker bearer token required; returns the selected phone's profile, shared campaign, linked contacts/activity, and owned document metadata. Unknown profiles return 404. Authentication data and other user profiles are excluded.
+- `GET /api/agent/context/documents/[id]?phoneNumber=...`: the same worker authentication and SQL owner lookup precede either Postgres or S3 byte reads. Unknown/foreign IDs return 404. All context responses use private, no-store caching.
+- The worker token is privileged to select any profile; only the trusted listener supplies the incoming sender identity. Never expose that token in widgets or browser code. Phone ownership remains unverified.
+- `agent/fetch_context.py` refreshes local snapshots through these read-only routes before Hermes drafts. Decisions still only log; live outreach and workspace write-back are unfinished.
 
 ## Files, environment, and demo
 

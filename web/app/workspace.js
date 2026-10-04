@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import logo from '../assets/logo.png';
 import { ArrowRight, ArrowUpRight, Bell, Check, ChevronDown, ChevronRight, CircleHelp, Download, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Link2, LoaderCircle, LogOut, MessageCircle, Plus, RefreshCw, Search, Settings2, ShieldCheck, Target, Upload, Users, X, Zap } from 'lucide-react';
 import Pipeline from './sankey';
 import { STAGES, MAX_FILE_BYTES, validateSponsor, validateEvent, outreachTotals, stageLabel, duplicateKey } from '../lib/model.mjs';
@@ -25,7 +27,7 @@ function Modal({title,subtitle,children,onClose,wide=false}) {
   useEffect(()=>{const dialog=ref.current;dialog.showModal();return()=>{if(dialog.open)dialog.close();};},[]);
   return <dialog ref={ref} className={`modal ${wide?'wide':''}`} onCancel={onClose} onClick={e=>{if(e.target===e.currentTarget)onClose();}}><div className="modal-heading"><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div><button className="icon-button" aria-label="Close dialog" onClick={onClose}><X size={20}/></button></div>{children}</dialog>;
 }
-function Logo(){return <div className="brand">ambassador<span className="brand-period">.</span></div>;}
+function Logo(){return <div className="brand"><Image className="brand-mark" src={logo} alt="" sizes="32px" preload/><span>ambassador<span className="brand-period">.</span></span></div>;}
 function Badge({stage}){return <span className={`badge ${stageClass(stage)}`}><i/>{stageLabel(stage)}</span>;}
 function Company({sponsor}){return <div className="company-cell"><span className="company-logo" style={{'--logo-color':sponsor.color||'#536b56'}}>{initials(sponsor.contact||sponsor.company)}</span><span><strong>{sponsor.contact||sponsor.company}</strong><small>{sponsor.company||sponsor.category}</small></span></div>;}
 function Empty({icon:Icon=FolderOpen,title,text,children}){return <div className="empty"><Icon size={32}/><h3>{title}</h3><p>{text}</p>{children}</div>;}

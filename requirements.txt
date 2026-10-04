@@ -1,7 +1,9 @@
 # Ambassador agent's external Python dependency, pinned to the installed revision.
 # Hermes declares its own Python dependencies in its pyproject.toml.
 hermes-agent @ git+https://github.com/NousResearch/hermes-agent.git@158fd638da1629c8e62caf9ade1515d162def8ab
+python-dotenv==1.2.2
 
+# python-dotenv reads worker settings from ignored .env.local files.
 # All other imports in agent/ are local modules or Python standard library modules.
 # Model-provider-specific extras are configured through Hermes setup.
 # The listener also requires a configured Hermes installation and Photon sidecar;
