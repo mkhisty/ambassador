@@ -1,5 +1,18 @@
 # Ambassador response widget
 
+Gmail inbox monitoring runs alongside iMessage when `GMAIL_INBOX_ENABLED=1`
+(the default). The website saves authenticated Pub/Sub notifications; the worker
+drains its durable inbox queue every 15 seconds and runs inbox turns under the
+same Hermes lock as iMessages. New email is relevant unless explicitly unrelated;
+messages needing a response produce an email approval widget. Approval sends
+a threaded Gmail reply. No-response mail does not text the owner. Mailbox watches
+renew daily, with history reconciliation after 10 quiet minutes. Initial watches
+start with future arrivals. Reconnect Google for `gmail.readonly` first.
+Protected Vercel URLs need `VERCEL_AUTOMATION_BYPASS_SECRET` in ignored
+`agent/.env.local`; it is used only for website API requests, never Hermes or S3.
+See `web/README.md` for cloud and database setup. Restart the listener after
+configuration changes; queued inbox messages survive restarts in Neon.
+
 `listen.py` receives a direct Photon iMessage and sends Hermes's natural reply
 straight back as plain text. Ordinary replies never create an approval widget.
 Incoming messages get a 👍 tapback immediately, including while Hermes is busy

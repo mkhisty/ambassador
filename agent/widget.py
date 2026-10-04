@@ -57,6 +57,8 @@ def validate_email_proposal(value, original):
         result['reviewId'] = original['reviewId']
     if original.get('attachments'):
         result['attachments'] = original['attachments']
+    if original.get('incomingMessageId'):
+        result['incomingMessageId'] = original['incomingMessageId']
     if original.get('recipients'):
         result['recipients'] = normalize_recipients(value.get('recipients'), original['recipients'])
         result['recipient'] = result['recipients'][0]['email']

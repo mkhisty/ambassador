@@ -42,6 +42,51 @@ The POC supports a single shared campaign with individual phone/password account
 
 Ambassador stores each account's Google refresh token encrypted in Neon. Users can disconnect/revoke the grant or reconnect to approve newly added scopes. The review page can create or update a Gmail draft; the user opens that draft in Gmail and presses Send there. Photon can check the primary calendar's free/busy intervals, then present an event proposal in its review card. Only **Add to Calendar** creates an opaque event that blocks the time; rejection creates nothing. Events are created on the connected account's primary calendar without inviting attendees. Gmail compose is a restricted OAuth scope; public release may require Google verification and a security assessment. In Testing, Google may expire refresh grants after seven days. Use `npm run db:check-google` to test state consumption, ownership, encryption, and cleanup without contacting Google.
 
+## Gmail inbox notifications
+
+Gmail sends mailbox changes through Cloud Pub/Sub to
+`/api/google/gmail/notifications`. The webhook verifies Google's OIDC identity
+and saves the latest notified cursor. The running Python listener drains the
+owner-scoped queue through `/api/agent/google/gmail/inbox` every 15 seconds.
+New email is relevant unless explicitly unrelated. Emails needing a response
+produce a draft widget; approval sends a threaded reply. Automated/no-response
+mail produces no widget or text. Inbound attachment names are included; their
+bytes are not fetched. Bodies are capped at 100,000 characters.
+
+The configured project is `password-313816`, topic `gmail-inbox`, subscription
+`gmail-inbox-ambassador`. The four `GMAIL_*` website settings are shown in
+`.env.example`. Run `npm run db:migrate-gmail-inbox` for the additive tables.
+From the repository root,
+`node web/scripts/configure-gmail-vercel.mjs https://YOUR-WEBSITE-ORIGIN`
+copies existing local Google credentials to the linked production project,
+creates automation access for protected Vercel URLs, and configures Pub/Sub.
+Register `https://YOUR-WEBSITE-ORIGIN/api/google/callback` in the OAuth client's
+authorized redirect URIs. Reconnect Google to grant `gmail.readonly`, then
+restart the listener. Set `GMAIL_INBOX_ENABLED=0` to disable monitoring.
+
+The private Vercel automation secret is a query parameter on the push endpoint
+and a header on worker API calls. The OIDC audience omits query parameters.
+Google OIDC verification and agent bearer authentication remain required.
+No credentials enter Hermes context or object-store requests.
+
+Watches renew daily while the listener runs. History reconciles after 10 quiet
+minutes. Initial registration begins with future arrivals; expired history
+rescans inbox messages since monitoring started with persisted paging.
+Notifications and emails are deduplicated. Processing leases expire after 10
+minutes; three failed attempts leave a failed record for inspection.
+`npm run db:check-gmail-inbox` verifies queue SQL with temporary tables, without
+contacting Gmail or processing real queue entries.
+
+Verified October 4, 2026: the chosen
+`https://ambassador-git-main-malhars-projects-3fcc794f.vercel.app` deployment
+accepts authenticated worker requests and Google's synthetic Pub/Sub push (204).
+Google authentication is still required after Vercel protection bypass. The
+existing OAuth client rejects this origin's callback with `redirect_uri_mismatch`;
+add the callback in Google Cloud before reconnecting. The current connection has
+not granted `gmail.readonly`; actual Gmail-arrival/draft/send verification awaits
+that consent and a restarted listener. Relevant tests and production build pass;
+the full website suite has an unrelated missing legacy demo fixture.
+
 ## Document storage
 
 Documents have an indexed `owner_phone_number` foreign key to `ambassador_users.phone_number`. Uploads assign this from the signed login session, ignoring any owner submitted by the browser. Workspace listings and ID-based downloads are filtered by that owner. `GET /api/documents?phoneNumber=7344199492` returns that owner's document metadata after login; a different requested phone returns 403. Unknown or another owner's document ID returns 404. Both Postgres and object-store files use the same ownership checks.

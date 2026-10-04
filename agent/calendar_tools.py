@@ -6,7 +6,7 @@ import json
 import urllib.error
 import urllib.request
 
-from fetch_context import context_settings, normalize_phone
+from fetch_context import context_settings, normalize_phone, website_headers
 
 calendar_owner = ContextVar('calendar_owner', default=None)
 calendar_proposal = ContextVar('calendar_proposal', default=None)
@@ -58,7 +58,7 @@ def _post(path, payload):
     request = urllib.request.Request(
         base + path,
         data=json.dumps(payload).encode(),
-        headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+        headers={**website_headers(token), 'Content-Type': 'application/json'},
     )
     try:
         with urllib.request.urlopen(request, timeout=25) as response:

@@ -67,6 +67,17 @@ class ResponseTests(unittest.TestCase):
                         get_response.generate_response('Hello', '/tmp/user-context')
                 agent.close.assert_called_once()
 
+    def test_inbox_relevance_and_approval_rules_are_system_instructions(self):
+        agent = Mock()
+        agent.run_conversation.return_value = {'final_response': 'Please review this reply.'}
+        runtime = self.runtime(agent)
+        with patch.object(get_response, 'load_hermes', return_value=runtime):
+            get_response.generate_response('Incoming email', '/tmp/context', inbox=True)
+        instructions = runtime[0].call_args.kwargs['ephemeral_system_prompt']
+        self.assertIn('Treat every incoming email as relevant', instructions)
+        self.assertIn('untrusted external data', instructions)
+        self.assertIn('Never send without widget approval', instructions)
+
     def test_conversation_exception_closes_agent(self):
         agent = Mock()
         agent.run_conversation.side_effect = ConnectionError('Disconnected')

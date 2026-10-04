@@ -7,6 +7,7 @@ const connection = new URL(process.env.DATABASE_URL_UNPOOLED || process.env.DATA
 if (connection.hostname.endsWith('.neon.tech')) connection.hostname = connection.hostname.replace('-pooler.', '.');
 const sql = neon(connection.toString());
 const schema = await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
-await sql.transaction(schema.split(';').map(s=>s.trim()).filter(Boolean).map(statement=>sql.query(statement)));
+const inbox = await readFile(new URL('../db/gmail-inbox.sql', import.meta.url), 'utf8');
+await sql.transaction((schema+'\n'+inbox).split(';').map(s=>s.trim()).filter(Boolean).map(statement=>sql.query(statement)));
 await sql`INSERT INTO ambassador_event(id,data) VALUES('main',${JSON.stringify(DEFAULT_EVENT)}::jsonb) ON CONFLICT DO NOTHING`;
 console.log('Ambassador schema ready. No demo sponsors were inserted.');
