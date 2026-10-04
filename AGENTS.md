@@ -51,6 +51,13 @@ provider, and Photon SDK dependencies in that installation's sidecar directory.
 It currently relies on this installation layout rather than a portable,
 version-pinned dependency setup.
 
+The root `requirements.txt` pins the Hermes Python package to revision
+`158fd638da1629c8e62caf9ade1515d162def8ab`; installing it pulls Hermes's
+declared Python dependencies. Ambassador's other Python imports are standard
+library or local modules. The pip manifest does not configure Hermes or install
+Photon's Node dependencies. The existing external installation path remains
+required by the listener; a fresh-clone bootstrap is still unfinished.
+
 For a developer on Linux, macOS, or WSL, install Hermes and configure their
 own model provider and Photon account:
 
@@ -92,7 +99,8 @@ extension, with a browser-link fallback.
 Remaining work to make developer setup reliably clone-and-run:
 
 - [ ] Add an Ambassador setup script and a complete fresh-clone walkthrough.
-- [ ] Pin and verify a compatible Hermes version and Photon SDK version.
+- [ ] Verify fresh-clone installation of the pinned Hermes revision and pin
+  a compatible Photon SDK version in Ambassador's own dependency setup.
 - [ ] Make Hermes installation and SDK paths configurable instead of assuming
   one home-directory layout.
 - [ ] Add dependency/configuration checks with actionable startup errors.

@@ -33,6 +33,19 @@ the `send_email()` function. Live sending and approval wiring are not implemente
 
 ## Run
 
+The root `requirements.txt` pins the external Hermes Python dependency and
+pulls its declared dependencies. The remaining agent Python code uses the
+standard library. From the repository root, install into your Python environment:
+
+```sh
+python3 -m pip install -r requirements.txt
+```
+
+This does not configure a model provider or provision the Photon sidecar.
+The current listener still expects the separate Hermes installation layout
+described in the root `AGENTS.md`. Website and sidecar JavaScript dependencies
+are installed with npm, and ngrok is installed separately.
+
 Requires the existing Hermes runtime and Photon SDK installation. Configure
 Photon with `hermes photon setup` and `hermes photon install-sidecar` if needed.
 The listener uses those credentials and installed SDK without changing Hermes.

@@ -1,0 +1,10 @@
+# Ambassador agent's external Python dependency, pinned to the installed revision.
+# Hermes declares its own Python dependencies in its pyproject.toml.
+hermes-agent @ git+https://github.com/NousResearch/hermes-agent.git@158fd638da1629c8e62caf9ade1515d162def8ab
+
+# All other imports in agent/ are local modules or Python standard library modules.
+# Model-provider-specific extras are configured through Hermes setup.
+# The listener also requires a configured Hermes installation and Photon sidecar;
+# see agent/README.md and AGENTS.md. A pip install alone does not configure these.
+# JavaScript dependencies are managed by web/package.json and Hermes's Photon
+# sidecar package.json; Node.js and ngrok are external executables, not pip packages.
