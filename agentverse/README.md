@@ -5,6 +5,11 @@
 
 ASI:One-discoverable Agentverse agent for event sponsorship operations. It inspects Ambassador's sponsor pipeline, picks qualified next steps, prepares evidence-grounded personalized outreach, and saves an organizer-approved offline preview with an auditable status. It does not contact sponsors or make commitments.
 
+**Live Agentverse agent:** Ambassador Sponsor Ops  
+**Address:** `agent1qfq9uls6py5fyvuj52z4ydmfya5tu9uma25xgm788kqdfcjjvku5wl3qzr6`  
+**Profile:** https://agentverse.ai/agents/details/agent1qfq9uls6py5fyvuj52z4ydmfya5tu9uma25xgm788kqdfcjjvku5wl3qzr6/profile  
+**ASI:One chat:** https://asi1.ai/ai/agent1qfq9uls6py5fyvuj52z4ydmfya5tu9uma25xgm788kqdfcjjvku5wl3qzr6
+
 The bundled leads are fictional demo data from `messaging-integration/demo/fixtures.json`. Live outreach remains in Ambassador's organizer-approved Spectrum/email integration. Agent Storage holds draft state across hosted invocations and scopes each draft to the approving sender.
 
 ## Agentverse setup
