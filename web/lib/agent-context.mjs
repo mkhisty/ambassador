@@ -17,7 +17,7 @@ export async function contextForPhone(phoneNumber) {
   const [campaign, contacts, activities, documents] = await Promise.all([
     sql`SELECT data FROM ambassador_event WHERE id='main'`,
     sql`SELECT s.id,s.data FROM ambassador_sponsors s JOIN ambassador_user_companies c ON c.company_id=s.id WHERE c.phone_number=${phone} ORDER BY s.id`,
-    sql`SELECT a.id,a.sponsor_id,a.kind,a.data,a.created_at FROM ambassador_activities a JOIN ambassador_user_companies c ON c.company_id=a.sponsor_id WHERE c.phone_number=${phone} ORDER BY a.created_at DESC`,
+    sql`SELECT DISTINCT a.id,a.sponsor_id,a.kind,a.data,a.created_at FROM ambassador_activities a LEFT JOIN ambassador_user_companies c ON c.company_id=a.sponsor_id WHERE a.owner_phone_number=${phone} OR c.phone_number=${phone} ORDER BY a.created_at DESC`,
     documentsForPhone(phone),
   ]);
   return {

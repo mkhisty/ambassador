@@ -29,11 +29,14 @@ CREATE INDEX IF NOT EXISTS ambassador_user_company_lookup ON ambassador_user_com
 CREATE TABLE IF NOT EXISTS ambassador_activities (
   id text PRIMARY KEY,
   sponsor_id text REFERENCES ambassador_sponsors(id),
+  owner_phone_number text REFERENCES ambassador_users(phone_number) ON UPDATE CASCADE ON DELETE CASCADE,
   kind text NOT NULL,
   data jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE ambassador_activities ADD COLUMN IF NOT EXISTS owner_phone_number text REFERENCES ambassador_users(phone_number) ON UPDATE CASCADE ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS ambassador_activity_time ON ambassador_activities(created_at DESC);
+CREATE INDEX IF NOT EXISTS ambassador_activity_owner ON ambassador_activities(owner_phone_number,created_at DESC);
 CREATE TABLE IF NOT EXISTS ambassador_documents (
   id text PRIMARY KEY,
   name text NOT NULL,
@@ -71,9 +74,31 @@ CREATE TABLE IF NOT EXISTS ambassador_outreach_drafts (
   recipient text NOT NULL,
   subject text NOT NULL DEFAULT '',
   body text NOT NULL,
-  status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','rejected','sent')),
+  reply_to text NOT NULL DEFAULT '',
+  review_id text,
+  cc jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(cc) = 'array'),
+  bcc jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(bcc) = 'array'),
+  attachment_refs jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(attachment_refs) = 'array'),
+  status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved','rejected','sending','send_unknown','failed','sent')),
   google_draft_id text,
+  google_message_id text,
+  send_error text,
+  approved_at timestamptz,
+  sent_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ambassador_outreach_one_open_draft ON ambassador_outreach_drafts(owner_phone_number,sponsor_id) WHERE status='draft';
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS review_id text;
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS cc jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS bcc jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS attachment_refs jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS reply_to text NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS ambassador_outreach_review_id ON ambassador_outreach_drafts(owner_phone_number,review_id) WHERE review_id IS NOT NULL;
+ALTER TABLE ambassador_outreach_drafts DROP CONSTRAINT IF EXISTS ambassador_outreach_drafts_status_check;
+ALTER TABLE ambassador_outreach_drafts ADD CONSTRAINT ambassador_outreach_drafts_status_check CHECK (status IN ('draft','approved','rejected','sending','send_unknown','failed','sent'));
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS google_message_id text;
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS send_error text;
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS approved_at timestamptz;
+ALTER TABLE ambassador_outreach_drafts ADD COLUMN IF NOT EXISTS sent_at timestamptz;
+DROP INDEX IF EXISTS ambassador_outreach_one_open_draft;
+CREATE UNIQUE INDEX ambassador_outreach_one_open_draft ON ambassador_outreach_drafts(owner_phone_number,sponsor_id) WHERE status='draft' AND review_id IS NULL;

@@ -43,9 +43,9 @@ export function parseCSV(text) {
   return rows;
 }
 
-export const FIELD_LABELS = {company:'Organization (optional)',contact:'Contact name',address:'Email / phone / profile',channel:'Channel',stage:'Stage',owner:'Owner',notes:'Relationship notes',nextAction:'Next action',nextDate:'Follow-up date',source:'Contact source URL',fit:'Reason for outreach',category:'Category'};
+export const FIELD_LABELS = {company:'Organization (optional)',contact:'Contact name',address:'Email / profile',phone:'Phone number',channel:'Channel',stage:'Stage',owner:'Owner',notes:'Relationship notes',nextAction:'Next action',nextDate:'Follow-up date',source:'Contact source URL',fit:'Reason for outreach',category:'Category'};
 export function guessMapping(headers) {
-  const aliases={company:['company','sponsor','organization'],contact:['contact','contact name','name'],address:['address','email','phone'],stage:['stage','status'],amount:['amount','ask','contribution'],notes:['notes','relationship','strategy'],source:['source','source url','lead source'],nextAction:['next action','nextaction'],nextDate:['next date','nextdate','follow-up date']};
+  const aliases={company:['company','sponsor','organization'],contact:['contact','contact name','name'],address:['address','email','profile'],phone:['phone','phone number','mobile'],stage:['stage','status'],amount:['amount','ask','contribution'],notes:['notes','relationship','strategy'],source:['source','source url','lead source'],nextAction:['next action','nextaction'],nextDate:['next date','nextdate','follow-up date']};
   // Continue accepting earlier spreadsheets without displaying financial fields in the campaign UI.
   return Object.fromEntries([...Object.keys(FIELD_LABELS),'amount','received'].map(key=>[key,headers.findIndex(h=>(aliases[key]||[key]).includes(String(h).trim().toLowerCase()))]));
 }

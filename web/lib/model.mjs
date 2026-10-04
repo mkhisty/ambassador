@@ -46,7 +46,10 @@ export function validateSponsor(input) {
   if (nextDate && !validDate(nextDate)) throw new Error('Follow-up date must use a valid YYYY-MM-DD date.');
   const channel = text('channel', 20) || 'email';
   if (!['email', 'imessage', 'linkedin'].includes(channel)) throw new Error('Channel must be email, imessage, or linkedin.');
-  return { company, contact, address: text('address', 500), channel, stage,
+  let phone = text('phone', 30).replace(/[\s().-]/g, '');
+  if (/^\d{10}$/.test(phone)) phone = '+1' + phone;
+  if (phone && !/^\+[1-9]\d{7,14}$/.test(phone)) throw new Error('Contact phone must use a valid phone number with country code.');
+  return { company, contact, address: text('address', 500), phone, channel, stage,
     amount, received, owner: text('owner', 160), notes: text('notes', 10000), nextAction: text('nextAction'), nextDate,
     source, fit: text('fit'), category: text('category', 80) || 'General', color: text('color', 20) || '#536b56' };
 }

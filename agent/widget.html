@@ -24,14 +24,22 @@
   [hidden] { display: none !important; }
   #status { font-size: 14px; line-height: 1.5; }
 </style>
-<main data-finished="__FINISHED__">
+<main data-finished="__FINISHED__" data-kind="__KIND_ID__">
   <small>AMBASSADOR · __KIND__</small>
   <h1>__TITLE__</h1>
   <pre id="response">__RESPONSE__</pre>
   <section class="calendar" id="calendar-details" __CALENDAR_HIDDEN__>__CALENDAR_DETAILS__</section>
+  <section class="calendar" id="email-details" __EMAIL_HIDDEN__>__EMAIL_DETAILS__</section>
   <section id="editor" hidden>
     <label for="text">Edit response</label>
     <textarea id="text" maxlength="20000"></textarea>
+  </section>
+  <section class="calendar" id="email-editor" hidden>
+    <label>To<input id="email-recipient" type="email" maxlength="254"></label>
+    <label>Subject<input id="email-subject" maxlength="500"></label>
+    <label>CC<input id="email-cc" placeholder="Comma-separated email addresses"></label>
+    <label>BCC<input id="email-bcc" placeholder="Comma-separated email addresses"></label>
+    <label>Message<textarea id="email-body" maxlength="20000"></textarea></label>
   </section>
   <div class="actions" id="review-actions">
     <button class="primary" id="approve">__APPROVE_LABEL__</button>
@@ -39,12 +47,12 @@
     <button id="reject">Reject</button>
   </div>
   <div class="actions" id="edit-actions" hidden>
-    <button class="primary" id="edit-approve">Approve edited response</button>
+    <button class="primary" id="edit-approve">__EDIT_LABEL__</button>
     <button id="cancel">Cancel</button>
   </div>
   <p id="status" role="status" aria-live="polite">__STATUS__</p>
   <a class="calendar-link" id="calendar-link" hidden target="_blank" rel="noreferrer">Open in Google Calendar</a>
-  <small>Messages are never sent automatically. Calendar events are created only after approval.</small>
+  <small>Messages and email are sent only after approval. Calendar events are created only after approval.</small>
 </main>
 <script src="/widget.js" defer></script>
 </html>

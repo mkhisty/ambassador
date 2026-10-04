@@ -4,6 +4,7 @@ export const GOOGLE_SCOPES = [
   'openid',
   'email',
   'https://www.googleapis.com/auth/gmail.compose',
+  'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/calendar.events.freebusy',
   'https://www.googleapis.com/auth/calendar.events.owned',
 ];
@@ -41,7 +42,8 @@ export const hashOAuthState=state=>createHash('sha256').update(state).digest('he
 export async function googleAccessToken(sql,phone,requiredScope) {
   const [connection]=await sql`SELECT google_email,scopes,refresh_token_ciphertext,refresh_token_iv,refresh_token_tag FROM ambassador_google_connections WHERE phone_number=${phone}`;
   if (!connection) throw Object.assign(new Error('Connect a Google account first.'),{status:409});
-  if (!connection.scopes.includes(requiredScope)) throw Object.assign(new Error('Reconnect Google and grant the requested permission.'),{status:403});
+  const requiredScopes=Array.isArray(requiredScope)?requiredScope:[requiredScope];
+  if (!requiredScopes.every(scope=>connection.scopes.includes(scope))) throw Object.assign(new Error('Reconnect Google and grant the requested permission.'),{status:403});
   const config=googleConfig(),key=tokenKey(),refreshToken=decryptGoogleToken(connection,key);
   const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:config.clientId,client_secret:config.clientSecret,refresh_token:refreshToken,grant_type:'refresh_token'}),signal:AbortSignal.timeout(12000)});
   const result=await response.json();

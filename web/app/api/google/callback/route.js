@@ -36,7 +36,7 @@ export async function GET(request) {
     }
     if (!refreshToken) throw new Error('Google did not return offline access. Disconnect Google and try again.');
     const encrypted=encryptGoogleToken(refreshToken,key),scopes=token.scope?String(token.scope).split(' ').filter(Boolean):GOOGLE_SCOPES;
-    if (!scopes.includes('https://www.googleapis.com/auth/gmail.compose')||!scopes.includes('https://www.googleapis.com/auth/calendar.events.owned')||!scopes.includes('https://www.googleapis.com/auth/calendar.events.freebusy')) throw new Error('Google did not grant all requested permissions. Reconnect and approve them.');
+    if (!scopes.includes('https://www.googleapis.com/auth/gmail.compose')||!scopes.includes('https://www.googleapis.com/auth/gmail.send')||!scopes.includes('https://www.googleapis.com/auth/calendar.events.owned')||!scopes.includes('https://www.googleapis.com/auth/calendar.events.freebusy')) throw new Error('Google did not grant all requested permissions. Reconnect and approve them.');
     await sql`INSERT INTO ambassador_google_connections(phone_number,google_subject,google_email,scopes,refresh_token_ciphertext,refresh_token_iv,refresh_token_tag) VALUES(${pending[0].phone_number},${profile.sub},${profile.email},${scopes},${encrypted.refresh_token_ciphertext},${encrypted.refresh_token_iv},${encrypted.refresh_token_tag}) ON CONFLICT(phone_number) DO UPDATE SET google_subject=excluded.google_subject,google_email=excluded.google_email,scopes=excluded.scopes,refresh_token_ciphertext=excluded.refresh_token_ciphertext,refresh_token_iv=excluded.refresh_token_iv,refresh_token_tag=excluded.refresh_token_tag,updated_at=now()`;
     return finish(request,'connected');
   } catch (error) {

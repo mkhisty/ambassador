@@ -15,7 +15,7 @@ export async function readWorkspace(ownerPhone=null) {
   const [events,sponsors,activities,documents,users]=await sql.transaction([
     sql`SELECT data FROM ambassador_event WHERE id='main'`,
     sql`SELECT id,data FROM ambassador_sponsors ORDER BY updated_at DESC`,
-    sql`SELECT id,sponsor_id,kind,data,created_at FROM ambassador_activities ORDER BY created_at DESC`,
+    sql`SELECT id,sponsor_id,kind,data,created_at FROM ambassador_activities WHERE owner_phone_number IS NULL OR owner_phone_number=${ownerPhone} ORDER BY created_at DESC`,
     sql`SELECT id,name,mime,size,sponsor_id,owner_phone_number,object_key,created_at FROM ambassador_documents WHERE owner_phone_number=${ownerPhone} ORDER BY created_at DESC`,
     sql`SELECT u.phone_number,u.name,u.email,u.details,COALESCE(jsonb_agg(c.company_id ORDER BY c.company_id) FILTER (WHERE c.company_id IS NOT NULL),'[]'::jsonb) AS company_ids FROM ambassador_users u LEFT JOIN ambassador_user_companies c USING(phone_number) GROUP BY u.phone_number ORDER BY u.updated_at DESC`,
   ]);

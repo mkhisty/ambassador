@@ -1,3 +1,6 @@
 .env.local
 __pycache__/
 agent/context/
+agent/data/reviews.json
+agent/data/followup-checks.json
+agent/data/.reviews-*

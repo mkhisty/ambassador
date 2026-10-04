@@ -38,6 +38,7 @@ The website handles campaign overview, contact management, bulk imports, relatio
 - Sign-in and sidebar branding use `assets/logo.png` through a static Next.js image import; the same asset supplies browser and Apple touch icons.
 - Navigation: Overview, Contacts, Documents, Imports, Campaign settings.
 - Overview counts contacts, responses, completed outcomes, and overdue follow-ups. Optional targets count outcomes, not dollars.
+- Overview shows a daily summary of recorded contact activity with a direct link to the Sankey pipeline.
 - Sankey widths count contacts. It shows a current snapshot, not historical conversion rates. Stage history remains separate.
 - Contact editor supports a name or organization, address, channel, category, owner, notes, reason for outreach, next action/date, and activity history. Organization is optional.
 - Visible stages: Identified, Ready, Contacted, Replied, Follow-up, Completed, Declined.

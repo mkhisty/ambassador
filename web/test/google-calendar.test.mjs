@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { encryptGoogleToken } from '../lib/google.mjs';
+import { encryptGoogleToken, googleAccessToken } from '../lib/google.mjs';
 import { createCalendarEvent, queryCalendarFreeBusy } from '../lib/google-calendar.mjs';
 
 const names=['GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_REDIRECT_URI','GOOGLE_TOKEN_ENCRYPTION_KEY'];
@@ -45,4 +45,14 @@ test('availability checks require free-busy scope and return busy blocks only',a
     assert.deepEqual(result.busy,[{start:event.start,end:event.end}]);
     assert.equal(JSON.parse(calls[1].options.body).items[0].id,'primary');
   } finally {globalThis.fetch=originalFetch;state.restore();}
+});
+
+test('Gmail approval requires both compose and send scopes',async()=>{
+  const state=setup(['https://www.googleapis.com/auth/gmail.compose']);
+  try {
+    await assert.rejects(googleAccessToken(state.sql,'+12025550100',[
+      'https://www.googleapis.com/auth/gmail.compose',
+      'https://www.googleapis.com/auth/gmail.send',
+    ]),{status:403,message:'Reconnect Google and grant the requested permission.'});
+  } finally {state.restore();}
 });

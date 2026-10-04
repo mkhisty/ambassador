@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 from fetch_context import fetch_context
-from send_email import email_owner, register_email_tool
+from send_email import email_owner, email_proposal, register_email_tool
 from calendar_tools import calendar_owner, calendar_proposal, register_calendar_tools
 
 HERMES_HOME = Path.home() / '.hermes'
@@ -23,11 +23,18 @@ def load_hermes():
 
 def get_response(text, phone_number):
     """Refresh the user's context, then prepare a response for review."""
+    return get_response_with_context(text, phone_number)[0]
+
+
+def get_response_with_context(text, phone_number):
+    """Return a review draft and the exact context snapshot used to create it."""
     context_directory = fetch_context(phone_number)
-    return generate_response(text, context_directory, phone_number=phone_number)
+    generated = generate_response(text, context_directory, phone_number=phone_number, return_proposal=True)
+    reply, proposal = generated if isinstance(generated, tuple) else (generated, None)
+    return reply, context_directory, proposal
 
 
-def generate_response(text, context_directory, *, phone_number=None):
+def generate_response(text, context_directory, *, phone_number=None, return_proposal=False):
     """Instruct Hermes to prepare a response using files in the context directory."""
     context_directory = Path(context_directory).resolve()
     instructions = (
@@ -38,10 +45,10 @@ def generate_response(text, context_directory, *, phone_number=None):
         'If the directory is missing or empty, respond using the user message '
         'without inventing context. Do not create, modify, or delete context files. '
         'Return the response text; the communication layer will display it for '
-        'approval. For an email request, call the send_email tool with to, subject, '
-        'text, and any attachment_paths, cc, bcc, or reply_to. The tool is currently '
-        'a placeholder and never sends email. Explain that the email is proposed '
-        'and not sent. Do not use other tools to send messages or email.'
+        'approval. For an email request, call the send_email tool with recipient, '
+        'subject, body, and owned attachment_refs when needed. The tool only prepares '
+        'an exact-fields email proposal for review. Never say the email was sent. '
+        'Do not use other tools to send messages or email.'
         ' For scheduling requests, use check_calendar_availability before suggesting '
         'a time. It reveals busy intervals only. When the user selects a time, call '
         'propose_calendar_event with the exact title, timezone-aware start and end, '
@@ -65,6 +72,7 @@ def generate_response(text, context_directory, *, phone_number=None):
         cwd=str(context_directory),
     )
     calendar_proposal.set(None)
+    email_proposal_token = email_proposal.set(None)
     owner_token = email_owner.set(phone_number)
     calendar_owner_token = calendar_owner.set(phone_number)
     try:
@@ -72,13 +80,15 @@ def generate_response(text, context_directory, *, phone_number=None):
         reply = (result.get('final_response') or '').strip()
         if result.get('failed') or not reply:
             raise RuntimeError(result.get('error') or 'Hermes returned no reply')
-        return reply
+        proposal = email_proposal.get()
+        return (reply, proposal) if return_proposal else reply
     finally:
         try:
             agent.close()
         finally:
             calendar_owner.reset(calendar_owner_token)
             email_owner.reset(owner_token)
+            email_proposal.reset(email_proposal_token)
 
 
 def handle_decision(response):

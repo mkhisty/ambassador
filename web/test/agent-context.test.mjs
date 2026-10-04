@@ -92,8 +92,8 @@ test('Actual context SQL scopes profiles, linked contacts, activity, and documen
     assert.equal(queries.length, 5);
     for (const { query, params } of queries) {
       if (query.includes('FROM ambassador_event')) continue;
-      assert.deepEqual(params, [phone]);
-      assert.match(query, /WHERE (?:c\.)?(?:owner_)?phone_number=\$1/);
+      assert.ok(params.length >= 1 && params.every(value => value === phone));
+      assert.match(query, /WHERE .*phone_number=\$1/);
     }
   } finally {
     neonConfig.fetchFunction = fetch;

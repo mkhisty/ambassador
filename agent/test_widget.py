@@ -1,7 +1,9 @@
 import concurrent.futures
 import json
+import secrets
 import threading
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 import urllib.error
 import urllib.request
@@ -12,11 +14,15 @@ class ReviewTests(unittest.TestCase):
     def setUp(self):
         self.responses = []
         self.now = 100
-        self.store = ReviewStore(self.responses.append, lambda: self.now)
+        self.created = 0
+        self.store = ReviewStore(self.responses.append, lambda: self.now,
+                                 on_message_approve=lambda event, text, key: {'messageId': 'provider-message'})
         self.event = {'sender': {'id': '+12025550100'}, 'space': {'id': 'dm'}, 'messageId': 'incoming'}
 
     def create(self, text='Hi Jamie, would you consider sponsoring our event?'):
-        return self.store.create(text, self.event)
+        self.created += 1
+        event = {**self.event, 'messageId': f'incoming-{self.created}'}
+        return self.store.create(text, event)
 
     def test_actions_log_final_response(self):
         for action in ('approve', 'reject', 'edit_approve'):
@@ -93,6 +99,41 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(result['action'], 'reject')
         self.assertEqual(created, [])
 
+    def test_message_sends_only_after_approval_and_inbound_is_deduplicated(self):
+        sends = []
+        self.store.on_message_approve = lambda event, text, key: sends.append((event['messageId'], text)) or {'messageId': 'outbound-1'}
+        event = {**self.event, 'messageId': 'same-inbound'}
+        key = self.store.create('Original', event)
+        self.assertEqual(self.store.create('Duplicate', event), key)
+        self.assertEqual(sends, [])
+        result = self.store.submit(key, {'action': 'edit_approve', 'text': 'Reviewed text'})
+        self.assertEqual(sends, [('same-inbound', 'Reviewed text')])
+        self.assertEqual(result['delivery']['messageId'], 'outbound-1')
+        self.assertEqual(self.store.get(key)['delivery'], 'sent')
+
+    def test_persisted_ambiguous_send_is_not_retried_after_restart(self):
+        state = Path(__file__).with_name('test-reviews-' + secrets.token_hex(8) + '.json')
+        try:
+            store = ReviewStore(clock=lambda: self.now, state_path=state,
+                                on_message_approve=lambda *args: (_ for _ in ()).throw(ConnectionError('lost response')))
+            key = store.create('Hi', self.event)
+            with self.assertRaisesRegex(RuntimeError, 'uncertain outcome'):
+                store.submit(key, {'action': 'approve'})
+            saved = json.loads(state.read_text())
+            saved[key]['result'] = None
+            saved[key]['processing'] = True
+            saved[key]['delivery'] = 'sending'
+            state.write_text(json.dumps(saved))
+            recovered = ReviewStore(clock=lambda: self.now, state_path=state,
+                                    on_message_approve=lambda *args: self.fail('must not resend'))
+            self.assertEqual(recovered.get(key)['delivery'], 'uncertain')
+            self.assertIsNone(recovered.get(key)['result'])
+            with self.assertRaisesRegex(RuntimeError, 'uncertain'):
+                recovered.submit(key, {'action': 'approve'})
+            self.assertIn('data-finished="true"', render(recovered.get(key)))
+        finally:
+            state.unlink(missing_ok=True)
+
     def test_http_confirms_decision_before_card_update_finishes(self):
         started = threading.Event()
         release = threading.Event()
@@ -109,7 +150,7 @@ class ReviewTests(unittest.TestCase):
         request = urllib.request.Request(url, data=b'{"action":"approve"}',
                                          headers={'Content-Type': 'application/json'})
         with urllib.request.urlopen(request, timeout=1) as response:
-            self.assertEqual(json.load(response), {'ok': True, 'action': 'approve', 'event': None})
+            self.assertEqual(json.load(response), {'ok': True, 'action': 'approve', 'event': None, 'email': None})
         self.assertTrue(started.wait(timeout=1))
         self.assertFalse(release.is_set())
         self.assertEqual(self.store.get(key)['result']['action'], 'approve')
