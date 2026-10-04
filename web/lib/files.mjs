@@ -10,7 +10,8 @@ export function validateFile(name,size) {
   return MIME_TYPES[extension];
 }
 export function objectStorageReady(){return ['S3_ENDPOINT','S3_BUCKET','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY'].every(k=>Boolean(process.env[k]));}
-function client(){return new S3Client({endpoint:process.env.S3_ENDPOINT,region:process.env.S3_REGION||'us-east-1',forcePathStyle:true,credentials:{accessKeyId:process.env.S3_ACCESS_KEY_ID,secretAccessKey:process.env.S3_SECRET_ACCESS_KEY}});}
+export function requireObjectStorage(){if(!objectStorageReady()){const error=new Error('File storage is not configured. Set the S3 bucket connection before uploading.');error.status=503;throw error;}}
+function client(){requireObjectStorage();return new S3Client({endpoint:process.env.S3_ENDPOINT,region:process.env.S3_REGION||'us-east-1',forcePathStyle:true,credentials:{accessKeyId:process.env.S3_ACCESS_KEY_ID,secretAccessKey:process.env.S3_SECRET_ACCESS_KEY}});}
 export async function storeObject(key,bytes,mime){await client().send(new PutObjectCommand({Bucket:process.env.S3_BUCKET,Key:key,Body:bytes,ContentType:mime}));}
 export async function readObject(key){const response=await client().send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));return Buffer.from(await response.Body.transformToByteArray());}
 export async function removeObject(key){await client().send(new DeleteObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));}

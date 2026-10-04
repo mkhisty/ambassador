@@ -36,7 +36,7 @@ export default function Workspace() {
   const [error,setError]=useState(''),[toast,setToast]=useState(''),[busy,setBusy]=useState(false),[password,setPassword]=useState(''),[phoneNumber,setPhoneNumber]=useState(''),[signup,setSignup]=useState(false),[invitePassword,setInvitePassword]=useState('');
   const [query,setQuery]=useState(''),[stageFilter,setStageFilter]=useState('All stages'),[selected,setSelected]=useState(null),[adding,setAdding]=useState(false),[importOpen,setImportOpen]=useState(false),[help,setHelp]=useState(false);
   const [eventDraft,setEventDraft]=useState(null),[documentSponsor,setDocumentSponsor]=useState(''),[importRows,setImportRows]=useState(null),[mapping,setMapping]=useState({}),[importName,setImportName]=useState('');
-  const importInput=useRef(null),documentInput=useRef(null);
+  const importInput=useRef(null),documentInput=useRef(null),importFile=useRef(null);
   const demo=data?.mode==='demo';
 
   function notify(message){setToast(message);}
@@ -62,13 +62,14 @@ export default function Workspace() {
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next));}catch{throw new Error('Browser storage is full. Export your data before clearing storage.');}
     setData(next);return next;
   }
-  async function mutate(body,message){
+  async function mutate(body,message,file=null){
     setBusy(true);setError('');
     try {
       if(demo){
         const next=structuredClone(data);
         if(body.action==='event')next.event=validateEvent(body.event);
         if(body.action==='import'){
+          if(file){const id=crypto.randomUUID();await saveDemoFile(id,file);next.documents.unshift({id,name:file.name,size:file.size,mime:file.type,sponsorId:null,ownerPhoneNumber:'+17344199492',storage:'This browser',at:new Date().toISOString()});}
           const keys=new Set(next.sponsors.map(duplicateKey));
           body.sponsors.forEach(raw=>{const sponsor=validateSponsor(raw),key=duplicateKey(sponsor);if(keys.has(key))return;keys.add(key);sponsor.id=crypto.randomUUID();next.sponsors.push(sponsor);next.activities.unshift({id:crypto.randomUUID(),sponsorId:sponsor.id,company:sponsor.company,kind:'stage',fromStage:null,toStage:sponsor.stage,text:'Added to the outreach pipeline',actor:'Campaign owner',at:new Date().toISOString()});});
         }
@@ -80,7 +81,12 @@ export default function Workspace() {
           next.activities.unshift({id:crypto.randomUUID(),sponsorId:body.id,company:sponsor.company,kind:old.stage!==sponsor.stage?'stage':'note',fromStage:old.stage,toStage:sponsor.stage,text:old.stage!==sponsor.stage?`Moved to ${stageLabel(sponsor.stage).toLowerCase()}`:'Updated relationship details',actor:'Campaign owner',at:new Date().toISOString()});
         }
         saveDemo(next);
-      }else{const next=await api('/api/workspace',{method:'POST',body:JSON.stringify(body)});setData(next);}
+      }else{
+        let next;
+        if(file){const form=new FormData();form.append('file',file);form.append('sponsors',JSON.stringify(body.sponsors));next=await api('/api/imports',{method:'POST',body:form});}
+        else next=await api('/api/workspace',{method:'POST',body:JSON.stringify(body)});
+        setData(next);
+      }
       notify(message);return true;
     }catch(e){setError(e.message);return false;}finally{setBusy(false);}
   }
@@ -90,11 +96,12 @@ export default function Workspace() {
     if(!file)return;setBusy(true);setError('');
     try {
       const rows=await readSpreadsheet(file);
+      importFile.current=file;
       setImportRows(rows);setMapping(guessMapping(rows[0]));setImportName(file.name);setImportOpen(true);
     }catch(e){setError(e.message);}finally{setBusy(false);if(importInput.current)importInput.current.value='';}
   }
   const preview=useMemo(()=>importRows?prepareImport(importRows,mapping,data?.sponsors||[]):null,[importRows,mapping,data?.sponsors]);
-  async function finishImport(){if(!preview?.valid.length)return;const saved=await mutate({action:'import',sponsors:preview.valid},'Contact import saved.');if(saved){setImportOpen(false);setImportRows(null);setPage('Contacts');}}
+  async function finishImport(){if(!preview?.valid.length)return;const saved=await mutate({action:'import',sponsors:preview.valid},'Contacts and original spreadsheet saved.',importFile.current);if(saved){setImportOpen(false);setImportRows(null);importFile.current=null;setPage('Contacts');}}
   async function uploadDocuments(files){
     if(!files?.length)return;setBusy(true);setError('');let count=0;
     try {
@@ -146,7 +153,7 @@ export default function Workspace() {
     {toast&&<div className="toast" role="status"><span><Check size={15}/></span>{toast}</div>}
     {(selected||adding)&&<SponsorEditor sponsor={selected||emptySponsor} activities={selected?recent.filter(a=>a.sponsorId===selected.id):[]} busy={busy} error={error} onClose={()=>{setSelected(null);setAdding(false);setError('');}} onSave={async sponsor=>{const saved=await mutate(selected?{action:'sponsor',id:selected.id,sponsor}:{action:'import',sponsors:[sponsor]},selected?'Relationship updated.':'Contact added.');if(saved){setSelected(null);setAdding(false);}}}/>}
     {importOpen&&<Modal title="Import contacts" subtitle={`${importName} · ${importRows.length-1} rows to review`} wide onClose={()=>{setImportOpen(false);setError('');}}><div className="import-modal-body"><div className="mapping-grid">{Object.entries(FIELD_LABELS).map(([key,label])=><label key={key}>{label}<select value={mapping[key]??-1} onChange={e=>setMapping({...mapping,[key]:Number(e.target.value)})}><option value={-1}>Skip this field</option>{importRows[0].map((header,i)=><option key={i} value={i}>{String(header)||`Column ${i+1}`}</option>)}</select></label>)}</div><div className="import-summary"><span><Check size={15}/>{preview.valid.length} ready</span><span>{preview.duplicates} duplicates skipped</span><span className={preview.errors.length?'error-text':''}>{preview.errors.length} invalid rows excluded</span></div>{preview.errors.length>0&&<div className="import-errors" role="alert">{preview.errors.slice(0,8).map(e=><p key={e.row}>Row {e.row}: {e.message}</p>)}</div>}<div className="preview-table"><table><thead><tr><th>Contact</th><th>Organization</th><th>Stage</th><th>Channel</th></tr></thead><tbody>{preview.valid.slice(0,5).map((s,i)=><tr key={i}><td>{s.contact||s.company}</td><td>{s.company||'—'}</td><td><Badge stage={s.stage}/></td><td>{s.channel}</td></tr>)}</tbody></table></div>{error&&<p className="error-text" role="alert">{error}</p>}</div><div className="modal-actions"><button className="button secondary" onClick={()=>setImportOpen(false)}>Cancel</button><button className="button primary" disabled={busy||!preview.valid.length} onClick={finishImport}>{busy?'Importing…':`Import ${preview.valid.length} contacts`}<ArrowRight size={15}/></button></div></Modal>}
-    {help&&<Modal title="Setup guide" subtitle="Neon, uploads, and Spectrum integration." wide onClose={()=>setHelp(false)}><div className="help-body"><div className="help-intro"><span className="upload-icon"><MessageCircle size={25}/></span><p>Ambassador plans outreach campaigns through Photon Spectrum. Import an audience, keep contact context, and track responses, follow-ups, and outcomes. Campaigns can cover invitations, recruiting, startup outreach, or community engagement. Daily outreach, approvals, follow-ups, and meeting coordination belong in the conversation interface.</p></div><ol><li><strong>Create a Neon project.</strong><p>Copy its pooled Postgres connection string into <code>web/.env.local</code> as <code>DATABASE_URL</code>.</p></li><li><strong>Protect your workspace.</strong><p>Set a private account invitation password in <code>WORKSPACE_INVITE_PASSWORD</code> (12+ characters) and random <code>SESSION_SECRET</code> (32+ characters). Run <code>npm run db:migrate</code>, then restart the app.</p></li><li><strong>Give documents a private home.</strong><p>Small files persist in Postgres by default. For Neon Object Storage, configure a private bucket and the <code>S3_*</code> server variables in <code>.env.example</code>.</p></li><li><strong>Connect the Spectrum worker.</strong><p>Set a random <code>AGENT_API_TOKEN</code>. Your partner’s worker uses <code>GET /api/workspace</code> and <code>POST /api/workspace</code> with a Bearer token. Keep tokens server-side; the website never sends outreach.</p></li><li><strong>Deploy when ready.</strong><p>Import the repo into Vercel with root directory <code>web</code>. Add the same environment variables. Domain setup can happen later.</p></li></ol><p className="help-note">Current POC: one shared campaign and phone-based account logins. Uploaded documents are stored intact. AI document extraction, live Spectrum synchronization, and calendar actions belong to the next integration step.</p><a className="text-button" href="https://neon.com/pricing" target="_blank" rel="noreferrer">Neon free plan details<ArrowUpRight size={14}/></a></div></Modal>}
+    {help&&<Modal title="Setup guide" subtitle="Neon, uploads, and Spectrum integration." wide onClose={()=>setHelp(false)}><div className="help-body"><div className="help-intro"><span className="upload-icon"><MessageCircle size={25}/></span><p>Ambassador plans outreach campaigns through Photon Spectrum. Import an audience, keep contact context, and track responses, follow-ups, and outcomes. Campaigns can cover invitations, recruiting, startup outreach, or community engagement. Daily outreach, approvals, follow-ups, and meeting coordination belong in the conversation interface.</p></div><ol><li><strong>Create a Neon project.</strong><p>Copy its pooled Postgres connection string into <code>web/.env.local</code> as <code>DATABASE_URL</code>.</p></li><li><strong>Protect your workspace.</strong><p>Set a private account invitation password in <code>WORKSPACE_INVITE_PASSWORD</code> (12+ characters) and random <code>SESSION_SECRET</code> (32+ characters). Run <code>npm run db:migrate</code>, then restart the app.</p></li><li><strong>Give documents a private home.</strong><p>All uploaded files, including contact spreadsheets, require a private S3-compatible bucket. Set the <code>S3_*</code> server variables in <code>.env.local</code>.</p></li><li><strong>Connect the Spectrum worker.</strong><p>Set a random <code>AGENT_API_TOKEN</code>. Your partner’s worker uses <code>GET /api/workspace</code> and <code>POST /api/workspace</code> with a Bearer token. Keep tokens server-side; the website never sends outreach.</p></li><li><strong>Deploy when ready.</strong><p>Import the repo into Vercel with root directory <code>web</code>. Add the same environment variables. Domain setup can happen later.</p></li></ol><p className="help-note">Current POC: one shared campaign and phone-based account logins. Uploaded documents are stored intact. AI document extraction, live Spectrum synchronization, and calendar actions belong to the next integration step.</p><a className="text-button" href="https://neon.com/pricing" target="_blank" rel="noreferrer">Neon free plan details<ArrowUpRight size={14}/></a></div></Modal>}
   </div>;
 }
 

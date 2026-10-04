@@ -76,7 +76,8 @@ Existing API fields are `event`, `sponsors`, and `sponsorId`. Stored stages rema
 - `GET /api/workspace`: shared campaign/contact context plus documents filtered to the session owner.
 - `POST /api/workspace`: `event`, `import`, `sponsor`, and `user` mutations. Import batches and profile/link replacements are transactional; contact updates and stage history are atomic.
 - `GET /api/documents`: signed-in user's document metadata. Optional `?phoneNumber=7344199492` is normalized and must match the session owner. Knowing a phone number alone never grants access.
-- `POST /api/documents`: multipart upload with `file` and optional `sponsorId`; server assigns document UUID and owner.
+- `POST /api/documents`: multipart upload with `file` and optional `sponsorId`; server assigns document UUID and owner. Live file bytes require private S3 storage.
+- `POST /api/imports`: authenticated multipart `file` (CSV/XLSX) and `sponsors` (JSON contact list). Original bytes go to S3; contacts, history, and document metadata commit together in Postgres. The original appears in Documents. Missing bucket configuration returns 503.
 - `GET /api/documents/[id]`: private attachment download after owner lookup.
 - `AGENT_API_TOKEN` enables privileged server-to-server workspace access. It does not grant access to the private browser document endpoints. Without a phone session, workspace responses contain no user documents.
 - The existing messaging service is separate and uses SQLite. Live synchronization with this Neon-backed website is not implemented automatically.
@@ -85,7 +86,7 @@ Existing API fields are `event`, `sponsors`, and `sponsorId`. Stored stages rema
 
 Supported uploads: PDF, DOCX, TXT, MD, CSV, XLSX; 1 byte through 2 MB per file. Uploads are stored intact; no AI parsing, document extraction, or indexing runs automatically.
 
-Without complete bucket configuration, live uploads persist in Neon Postgres `bytea`. With `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`, new uploads use a private S3-compatible bucket. These can be Neon Object Storage credentials; an AWS account is not required. Existing Postgres files remain readable and are not migrated automatically. Object keys include owner and document ID; secrets stay server-side. Bucket connectivity has not been verified in this workspace yet.
+All live uploads, including original CSV/XLSX contact imports, require a private S3-compatible bucket configured with `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`. There is no Postgres-byte fallback for uploads. These can be Neon Object Storage credentials; an AWS account is not required. Existing Postgres files remain readable. `npm run files:migrate` copies them to S3, verifies downloaded bytes, then replaces database bytes with object keys; it refuses unowned files. Object keys include owner and document ID; secrets stay server-side. Bucket connectivity has not been verified in this workspace yet.
 
 Use `.env.example` and `.env.bucket.example` as templates. Real values belong in ignored `.env.local`, then in the matching Vercel environment. Preserve existing environment values when adding configuration. `WORKSPACE_PASSWORD` remains required for initial account bootstrap/auth readiness; new-account invitations use the separate `WORKSPACE_INVITE_PASSWORD`.
 

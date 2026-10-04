@@ -46,11 +46,13 @@ Run `npm run db:migrate` before enabling the new login. `npm run db:setup-owner`
 
 PDF, DOCX, TXT, MD, CSV, and XLSX files up to 2 MB each can be uploaded in bulk. Uploaded files are stored intact and downloaded as attachments; no AI extraction is performed yet.
 
-By default, bytes persist in the Neon Postgres `ambassador_documents.content` column. This is sufficient for small hackathon briefs and uses your database storage quota. To use Neon Object Storage, provision a **private** S3-compatible bucket and set `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` from its credentials. The backend then writes file bytes to that bucket and metadata to Postgres. Existing Postgres-backed files remain downloadable. Keep access credentials valid for the bucket and branch where each file lives; do not point a production database at a preview bucket.
+All live document uploads and original contact-import spreadsheets store their bytes in a **private S3-compatible bucket**. Postgres stores file metadata, ownership, and structured contact records. Missing bucket settings reject uploads; there is no database-byte fallback. Provision a private bucket and set `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` from its credentials. The backend writes file bytes to that bucket and metadata to Postgres. Contact imports save the original spreadsheet and contact records together; a failed database transaction cleans up the newly uploaded object. Existing Postgres-backed files remain downloadable. Run `npm run files:migrate` after configuring the bucket to move existing files: it verifies downloaded S3 bytes before removing database bytes. Keep access credentials valid for the bucket and branch where each file lives; do not point a production database at a preview bucket.
 
 Document downloads require an organizer session. Database and object storage credentials never enter the browser. Upload limits keep requests within ordinary Vercel request payload limits. For large decks and archives, add direct signed uploads rather than raising this endpoint's limit.
 
 ## Imports and charts
+
+Each live contact import archives its original CSV/XLSX in the private bucket. It appears in Documents as well as producing structured contact records. Demo imports preserve originals in browser IndexedDB.
 
 CSV and XLSX imports support column mapping, a validation preview, and at most 500 sponsors per file. Matching company and contact address/name records are skipped, including duplicates within a file. Invalid rows are listed and excluded; fix them in the source spreadsheet and reimport. XLSX reads the first worksheet and formula results without evaluating formulas.
 

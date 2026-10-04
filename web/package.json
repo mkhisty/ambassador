@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
+    "files:migrate": "node --env-file-if-exists=.env.local scripts/migrate-files.mjs",
     "db:check": "node --env-file-if-exists=.env.local scripts/check-neon.mjs",
     "test:document-api": "node --env-file-if-exists=.env.local scripts/check-document-api.mjs",
     "db:setup-owner": "node --env-file-if-exists=.env.local scripts/setup-owner.mjs",
